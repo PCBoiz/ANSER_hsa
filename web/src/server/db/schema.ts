@@ -19,14 +19,18 @@
  */
 
 import { sql } from "drizzle-orm";
+import type { AnyPgColumn } from "drizzle-orm/pg-core";
 import {
   bigint,
   boolean,
   check,
   date,
+  index,
   integer,
+  jsonb,
   numeric,
   pgTable,
+  primaryKey,
   text,
   timestamp,
   unique,
@@ -39,6 +43,11 @@ const nguonCheck = (t: string) =>
   check(`${t}_nguon_hop_le`, sql`nguon in ('mau','that')`);
 
 const taoLuc = () => timestamp("tao_luc", { withTimezone: true }).notNull().defaultNow();
+
+/** Kỳ luôn là 'YYYY-MM'. Không CHECK thì một chữ "T7/2026" lọt vào là mọi báo cáo
+ *  theo kỳ âm thầm bỏ sót dòng đó — không lỗi, chỉ thiếu. */
+const kyCheck = (ten: string, cot: string) =>
+  check(`${ten}_ky_dung_dinh_dang`, sql.raw(`${cot} ~ '^[0-9]{4}-[0-9]{2}$'`));
 
 /* ════════════════════════════════ tài khoản ════════════════════════════════ */
 
@@ -54,7 +63,9 @@ export const nguoiDung = pgTable(
     // Bốn cấp. Thù lao giáo viên là dữ liệu nhạy cảm nội bộ — trợ giảng không
     // được nhìn thấy, nên phân quyền không còn là thứ hoãn được như bên Body.
     vaiTro: text("vai_tro").notNull().default("tro_giang"),
-    nhanVienId: uuid("nhan_vien_id"),
+    nhanVienId: uuid("nhan_vien_id").references((): AnyPgColumn => nhanVien.id, {
+      onDelete: "set null",
+    }),
     taoLuc: taoLuc(),
   },
   (t) => [
@@ -114,7 +125,9 @@ export const thamSoPhapLy = pgTable(
      * vì trông y hệt bảng đã được kiểm.
      */
     daDuyet: boolean("da_duyet").notNull().default(false),
-    duyetBoiId: uuid("duyet_boi_id"),
+    duyetBoiId: uuid("duyet_boi_id").references((): AnyPgColumn => nguoiDung.id, {
+      onDelete: "set null",
+    }),
     duyetLuc: timestamp("duyet_luc", { withTimezone: true }),
     taoLuc: taoLuc(),
   },
@@ -144,7 +157,9 @@ export const bacThueTncn = pgTable(
     hieuLucDen: date("hieu_luc_den"),
     nguonVanBan: text("nguon_van_ban").notNull(),
     daDuyet: boolean("da_duyet").notNull().default(false),
-    duyetBoiId: uuid("duyet_boi_id"),
+    duyetBoiId: uuid("duyet_boi_id").references((): AnyPgColumn => nguoiDung.id, {
+      onDelete: "set null",
+    }),
     duyetLuc: timestamp("duyet_luc", { withTimezone: true }),
   },
   (t) => [
@@ -200,8 +215,13 @@ export const hocVien = pgTable(
     email: text("email"),
     truong: text("truong"),
     khoiLop: text("khoi_lop"),
-    maNgoai: text("ma_ngoai"), // mã bên MISA EMIS nếu khách đang dùng
+    // UNIQUE: đồng bộ EMIS hai lần mà không có ràng buộc này là tạo ra học viên
+    // trùng, và tiền học phí khớp vào đúng một nửa trong hai bản ghi đó.
+    maNgoai: text("ma_ngoai").unique(),
     ghiChu: text("ghi_chu"),
+    // 5.4 — Luật 91/2025. Ẩn danh hoá chứ không xoá: xoá học viên là thủng sổ kế
+    // toán, giữ nguyên là vi phạm quyền yêu cầu xoá. Ẩn danh thoả cả hai.
+    anDanhLuc: timestamp("an_danh_luc", { withTimezone: true }),
     nguon: nguon(),
     taoLuc: taoLuc(),
   },
@@ -216,6 +236,7 @@ export const phuHuynh = pgTable(
     dienThoai: text("dien_thoai"),
     email: text("email"),
     zaloId: text("zalo_id"),
+    anDanhLuc: timestamp("an_danh_luc", { withTimezone: true }),
     nguon: nguon(),
     taoLuc: taoLuc(),
   },
@@ -230,7 +251,7 @@ export const hocVienPhuHuynh = pgTable(
     quanHe: text("quan_he"), // 'bo' | 'me' | 'nguoi_giam_ho'
     laNguoiDaiDien: boolean("la_nguoi_dai_dien").notNull().default(false),
   },
-  (t) => [unique("hoc_vien_phu_huynh_cap").on(t.hocVienId, t.phuHuynhId)],
+  (t) => [primaryKey({ columns: [t.hocVienId, t.phuHuynhId] })],
 );
 
 export const lopHoc = pgTable(
@@ -287,7 +308,9 @@ export const buoiHoc = pgTable(
     ngay: date("ngay").notNull(),
     gioBatDau: text("gio_bat_dau"),
     soGio: numeric("so_gio", { precision: 5, scale: 2 }), // buổi 1,5 giờ là chuyện thường
-    giaoVienId: uuid("giao_vien_id"),
+    giaoVienId: uuid("giao_vien_id").references((): AnyPgColumn => giaoVien.id, {
+      onDelete: "set null",
+    }),
     trangThai: text("trang_thai").notNull().default("theo_lich"),
     nguon: nguon(),
     taoLuc: taoLuc(),
@@ -325,6 +348,9 @@ export const giaoDichNganHang = pgTable(
     id: uuid("id").primaryKey().defaultRandom(),
     maGiaoDich: text("ma_giao_dich").notNull().unique(), // chống nạp trùng khi tải lại sao kê
     ngay: timestamp("ngay", { withTimezone: true }).notNull(),
+    // A3 — sao kê có CẢ tiền vào lẫn tiền ra. Không có cột này thì nạp một tháng
+    // xong, doanh thu bị thổi phồng bằng đúng số tiền đã chi ra.
+    chieu: text("chieu").notNull(),
     soTien: bigint("so_tien", { mode: "number" }).notNull(),
     noiDung: text("noi_dung"),
     nganHang: text("ngan_hang"),
@@ -336,6 +362,8 @@ export const giaoDichNganHang = pgTable(
   (t) => [
     nguonCheck("giao_dich_ngan_hang"),
     check("giao_dich_nguon_nap_hop_le", sql`${t.nguonNap} in ('sepay','sao_ke')`),
+    check("giao_dich_chieu_hop_le", sql`${t.chieu} in ('vao','ra')`),
+    check("giao_dich_so_tien_duong", sql`${t.soTien} > 0`),
   ],
 );
 
@@ -344,7 +372,19 @@ export const khopThu = pgTable(
   {
     id: uuid("id").primaryKey().defaultRandom(),
     giaoDichId: uuid("giao_dich_id").notNull().references(() => giaoDichNganHang.id, { onDelete: "cascade" }),
-    thuHocPhiId: uuid("thu_hoc_phi_id").references(() => thuHocPhi.id, { onDelete: "set null" }),
+    // A1 — trỏ về SỔ TỔNG chứ không riêng học phí: khớp tiền là khớp với một
+    // khoản thu, mà từ 5.1 mọi khoản thu đều nằm trong `khoan_thu`.
+    khoanThuId: uuid("khoan_thu_id").references((): AnyPgColumn => khoanThu.id, {
+      onDelete: "set null",
+    }),
+    /**
+     * A1 — SỐ TIỀN ĐƯỢC PHÂN BỔ, không phải toàn bộ giao dịch.
+     *
+     * Thiếu cột này thì mô hình là 1–1 và hai tình huống thường gặp nhất không
+     * diễn tả nổi: phụ huynh chuyển một lần cho HAI con, và một khoản học phí
+     * đóng làm BA lần. Trung tâm nào có anh chị em học cùng là dính ngay.
+     */
+    soTien: bigint("so_tien", { mode: "number" }).notNull(),
     // 'ma_qr' = khớp chính xác theo mã trên VietQR; 'suy_luan' = khớp mờ, cần người duyệt.
     cachKhop: text("cach_khop").notNull(),
     doTinCay: numeric("do_tin_cay", { precision: 4, scale: 3 }),
@@ -357,10 +397,12 @@ export const khopThu = pgTable(
     nguonCheck("khop_thu"),
     check("khop_cach_hop_le", sql`${t.cachKhop} in ('ma_qr','suy_luan','nguoi_gan')`),
     // Khớp mờ KHÔNG được coi là xong nếu chưa ai duyệt.
+    check("khop_so_tien_duong", sql`${t.soTien} > 0`),
     check(
       "khop_suy_luan_phai_co_nguoi_duyet",
-      sql`${t.cachKhop} <> 'suy_luan' or ${t.duyetLuc} is not null or ${t.thuHocPhiId} is null`,
+      sql`${t.cachKhop} <> 'suy_luan' or ${t.duyetLuc} is not null or ${t.khoanThuId} is null`,
     ),
+    index("khop_theo_giao_dich").on(t.giaoDichId),
   ],
 );
 
@@ -446,6 +488,11 @@ export const buoiDay = pgTable(
     soGio: numeric("so_gio", { precision: 5, scale: 2 }),
     donGia: bigint("don_gia", { mode: "number" }).notNull(), // theo buổi hoặc theo giờ
     tinhTheo: text("tinh_theo").notNull().default("buoi"),
+    // A4 — không có cột này thì giáo viên hỏi "sao tháng này em được ngần này"
+    // mà không ai mở ra được danh sách buổi. Một buổi thuộc tối đa một bảng.
+    thuLaoId: uuid("thu_lao_id").references((): AnyPgColumn => thuLao.id, {
+      onDelete: "set null",
+    }),
     nguon: nguon(),
     taoLuc: taoLuc(),
   },
@@ -474,6 +521,7 @@ export const thuLao = pgTable(
   },
   (t) => [
     nguonCheck("thu_lao"),
+    kyCheck("thu_lao", "ky"),
     unique("thu_lao_giao_vien_ky").on(t.giaoVienId, t.ky),
     check("thu_lao_can_doi", sql`${t.thucNhan} = ${t.tongTruocThue} - ${t.khauTruTncn}`),
   ],
@@ -559,6 +607,11 @@ export const bangLuong = pgTable(
     giamTruPhuThuoc: bigint("giam_tru_phu_thuoc", { mode: "number" }).notNull().default(0),
     thuNhapTinhThue: bigint("thu_nhap_tinh_thue", { mode: "number" }).notNull().default(0),
     tncn: bigint("tncn", { mode: "number" }).notNull().default(0),
+    // C5 — bảng lương thật có ba khoản này. CHECK cũ bỏ qua chúng nên mọi bảng
+    // có phụ cấp đều vi phạm ràng buộc và không ghi được.
+    phuCap: bigint("phu_cap", { mode: "number" }).notNull().default(0),
+    thuong: bigint("thuong", { mode: "number" }).notNull().default(0),
+    khauTruKhac: bigint("khau_tru_khac", { mode: "number" }).notNull().default(0),
     thucNhan: bigint("thuc_nhan", { mode: "number" }).notNull(),
     nguon: nguon(),
     taoLuc: taoLuc(),
@@ -570,59 +623,145 @@ export const bangLuong = pgTable(
     // đổi theo năm nên nó nằm ở tham_so_phap_ly, không CHECK cứng ở đây được.
     // Chỉ chặn được điều luôn đúng: lương đóng không vượt lương thực tế.
     check("bang_luong_dong_khong_vuot_thuc_te", sql`${t.luongDongBhxh} <= ${t.luongThucTe}`),
-    check("bang_luong_can_doi", sql`${t.thucNhan} = ${t.luongThucTe} - ${t.bhxhNld} - ${t.tncn}`),
+    kyCheck("bang_luong", "ky"),
+    check(
+      "bang_luong_can_doi",
+      sql`${t.thucNhan} = ${t.luongThucTe} + ${t.phuCap} + ${t.thuong} - ${t.bhxhNld} - ${t.tncn} - ${t.khauTruKhac}`,
+    ),
   ],
 );
 
 /* ═════════════════════════════ thuế và hồ sơ ══════════════════════════════ */
 
-export const doanhThuPhanLoai = pgTable(
-  "doanh_thu_phan_loai",
+/* ═══════════════════════ sổ thu chi — một sổ duy nhất ═════════════════════
+ * Quyết định 5.1. `khoan_thu` là SỔ TỔNG: học phí nhập tay bây giờ ghi thẳng
+ * vào đây, tới GĐ5 khi có `thu_hoc_phi` nối đăng ký và VietQR thì nó cũng ghi
+ * vào cùng sổ với nguon_loai='thu_hoc_phi'.
+ *
+ * Vì sao một sổ chứ không hai: mọi báo cáo doanh thu cộng ở MỘT nơi. Hai sổ
+ * nghĩa là mỗi câu hỏi doanh thu đều phải nhớ cộng cả hai, và quên một vế là
+ * loại lỗi ra số nhỏ hơn thực tế mà không có gì báo.
+ * ═════════════════════════════════════════════════════════════════════════ */
+
+export const khoanThu = pgTable(
+  "khoan_thu",
   {
     id: uuid("id").primaryKey().defaultRandom(),
-    // Cặp nguồn đa hình — bài học 4. Mọi dòng doanh thu truy được về chứng từ gốc.
-    nguonLoai: text("nguon_loai").notNull(),
-    nguonId: uuid("nguon_id").notNull(),
+    ngay: date("ngay").notNull(),
+    ky: text("ky").notNull(), // 'YYYY-MM', suy từ `ngay` lúc ghi
     soTien: bigint("so_tien", { mode: "number" }).notNull(),
-    dienThue: text("dien_thue").notNull(), // 'khong_chiu' | 'gtgt_5' | 'gtgt_10'
-    canCuPhapLy: text("can_cu_phap_ly").notNull(),
+    moTa: text("mo_ta"),
     /**
-     * Trung tâm chạy hai sổ: sổ quản trị đầy đủ và sổ thuế nộp cơ quan, chênh
-     * nhau ở doanh thu. Cột này GHI LẠI SỰ THẬT đó, không phải để giấu:
+     * Quyết định 5.2 — diện thuế nằm TRÊN DÒNG.
      *
-     *  - Kho dữ liệu vẫn đầy đủ. Chủ trung tâm thấy CẢ HAI con số cạnh nhau,
-     *    nên biết lãi thật là bao nhiêu — thứ hiện giờ không ai nói được.
-     *  - Bản kết xuất sang MISA phải NÊU RÕ đã loại bao nhiêu dòng và tổng bao
-     *    nhiêu. Không có đường nào tạo ra một bản xuất lặng lẽ bỏ dòng.
-     *  - `doi_chieu_misa` chỉ đối chiếu trong phần 'da_ke_khai'. Đó mới đúng
-     *    việc của nó: soi sai sót nhập liệu. Đối chiếu cả phần chưa kê khai chỉ
-     *    sinh ra một danh sách mà không ai muốn nó tồn tại.
-     *
-     * 'chua_quyet' = chưa ai quyết, KHÁC 'chua_ke_khai' là đã quyết không kê.
+     * Một phiếu thu gồm học phí (không chịu) và bán tài liệu (10%) được nhập
+     * thành HAI dòng ngay từ đầu, đúng cách kế toán ghi sổ. Mô hình cũ khoá mỗi
+     * chứng từ vào đúng một diện, buộc kế toán chọn một: chọn 'khong_chiu' là
+     * khai thiếu, chọn 'gtgt_10' là nộp thừa. Cả hai đều sai và không ai thấy.
      */
+    dienThue: text("dien_thue").notNull().default("chua_quyet"),
+    /** Hai sổ — xem ghi chú dài ở `can_cu_dien_thue`. Mặc định CHƯA AI QUYẾT. */
     dienKeKhai: text("dien_ke_khai").notNull().default("chua_quyet"),
-    nguoiDuyetId: uuid("nguoi_duyet_id").references(() => nguoiDung.id, { onDelete: "set null" }),
-    duyetLuc: timestamp("duyet_luc", { withTimezone: true }),
+    // Cặp nguồn đa hình — bài học 4. 'tu_nhap' = gõ tay, chưa có chứng từ trong hệ thống.
+    nguonLoai: text("nguon_loai").notNull().default("tu_nhap"),
+    nguonId: uuid("nguon_id"),
     nguon: nguon(),
     taoLuc: taoLuc(),
   },
   (t) => [
-    nguonCheck("doanh_thu_phan_loai"),
-    unique("doanh_thu_nguon").on(t.nguonLoai, t.nguonId),
-    check("doanh_thu_nguon_loai_hop_le", sql`${t.nguonLoai} in ('thu_hoc_phi','ban_tai_lieu','cho_thue','khac')`),
-    check("doanh_thu_dien_hop_le", sql`${t.dienThue} in ('khong_chiu','gtgt_5','gtgt_10')`),
+    nguonCheck("khoan_thu"),
+    kyCheck("khoan_thu", "ky"),
+    check("khoan_thu_so_tien_duong", sql`${t.soTien} > 0`),
+    check("khoan_thu_dien_hop_le", sql`${t.dienThue} in ('khong_chiu','gtgt_5','gtgt_10','chua_quyet')`),
     check(
-      "doanh_thu_dien_ke_khai_hop_le",
+      "khoan_thu_ke_khai_hop_le",
       sql`${t.dienKeKhai} in ('da_ke_khai','chua_ke_khai','chua_quyet')`,
     ),
+    check(
+      "khoan_thu_nguon_loai_hop_le",
+      sql`${t.nguonLoai} in ('tu_nhap','thu_hoc_phi','ban_tai_lieu','cho_thue','khac')`,
+    ),
+    // Gõ tay thì không có chứng từ để trỏ; mọi nguồn khác thì bắt buộc có.
+    check("khoan_thu_nguon_du_cap", sql`(${t.nguonLoai} = 'tu_nhap') = (${t.nguonId} is null)`),
+    index("khoan_thu_theo_ky").on(t.ky),
+    index("khoan_thu_theo_ngay").on(t.ngay),
   ],
+);
+
+export const khoanChi = pgTable(
+  "khoan_chi",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    ngay: date("ngay").notNull(),
+    ky: text("ky").notNull(),
+    soTien: bigint("so_tien", { mode: "number" }).notNull(),
+    moTa: text("mo_ta"),
+    nhom: text("nhom").notNull(),
+    /**
+     * Song song với `dien_ke_khai` bên doanh thu.
+     *
+     * Chi phí không có hoá đơn hợp lệ thì KHÔNG được trừ khi tính thuế TNDN.
+     * Mặc định `false`: chưa chứng minh được thì chưa trừ, chứ không phải cứ
+     * chi là trừ. Đoán ngược lại là khai thiếu thuế.
+     */
+    duocTru: boolean("duoc_tru").notNull().default(false),
+    lyDoKhongTru: text("ly_do_khong_tru"),
+    nguonLoai: text("nguon_loai").notNull().default("tu_nhap"),
+    nguonId: uuid("nguon_id"),
+    nguon: nguon(),
+    taoLuc: taoLuc(),
+  },
+  (t) => [
+    nguonCheck("khoan_chi"),
+    kyCheck("khoan_chi", "ky"),
+    check("khoan_chi_so_tien_duong", sql`${t.soTien} > 0`),
+    check(
+      "khoan_chi_nhom_hop_le",
+      sql`${t.nhom} in ('thue_mat_bang','dien_nuoc','thu_lao','luong','marketing','thiet_bi','van_phong_pham','khac')`,
+    ),
+    check(
+      "khoan_chi_nguon_loai_hop_le",
+      sql`${t.nguonLoai} in ('tu_nhap','thu_lao','bang_luong','khac')`,
+    ),
+    check("khoan_chi_nguon_du_cap", sql`(${t.nguonLoai} = 'tu_nhap') = (${t.nguonId} is null)`),
+    index("khoan_chi_theo_ky").on(t.ky),
+    index("khoan_chi_theo_ngay").on(t.ngay),
+  ],
+);
+
+/**
+ * Quyết định 5.2 — bảng này KHÔNG còn giữ số tiền hay diện thuế nữa.
+ *
+ * Diện thuế đã nằm trên `khoan_thu`. Ở đây chỉ ghi **vì sao** xếp vào diện đó
+ * và **ai** chịu trách nhiệm, cho những dòng cần giải trình. 90% dòng học phí
+ * là "không chịu thuế" hiển nhiên — ép mỗi dòng một bản ghi căn cứ chỉ tạo rác.
+ *
+ * Về hai sổ: kho dữ liệu vẫn đầy đủ, chủ trung tâm thấy CẢ HAI con số cạnh
+ * nhau. Bản kết xuất sang MISA phải nêu rõ đã loại bao nhiêu dòng và tổng bao
+ * nhiêu — không có đường nào tạo ra một bản xuất lặng lẽ bỏ dòng. Và
+ * `doi_chieu_misa` chỉ đối chiếu trong phần 'da_ke_khai', để nó làm đúng việc
+ * soi sai sót nhập liệu thay vì sinh ra một danh sách không ai muốn tồn tại.
+ */
+export const canCuDienThue = pgTable(
+  "can_cu_dien_thue",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    khoanThuId: uuid("khoan_thu_id")
+      .notNull()
+      .references(() => khoanThu.id, { onDelete: "cascade" }),
+    canCuPhapLy: text("can_cu_phap_ly").notNull(),
+    ghiChu: text("ghi_chu"),
+    nguoiDuyetId: uuid("nguoi_duyet_id").references(() => nguoiDung.id, { onDelete: "set null" }),
+    duyetLuc: timestamp("duyet_luc", { withTimezone: true }),
+    taoLuc: taoLuc(),
+  },
+  (t) => [unique("can_cu_moi_khoan_thu_mot_dong").on(t.khoanThuId)],
 );
 
 /* ══════════════════════════ kho chứng từ và tài liệu ══════════════════════
  * Chị Mai: "HSA chỉ là của ai người đó giữ trên máy cá nhân và gg drive của
  * doanh nghiệp" — chứng từ, hợp đồng, bản xuất MISA nằm rải rác, không ai tìm
- * lại được. Đây là mảng chiến lược v1 và v2 đều không có, mà lại là nỗi đau
- * khách tự nói ra trước.
+ * lại được. Nỗi đau khách tự nói ra trước khi được hỏi.
  * ═════════════════════════════════════════════════════════════════════════ */
 
 export const taiLieu = pgTable(
@@ -653,10 +792,67 @@ export const taiLieu = pgTable(
       "tai_lieu_loai_hop_le",
       sql`${t.loai} in ('chung_tu','hop_dong','ban_xuat_misa','to_khai','giay_phep','sao_ke','khac')`,
     ),
+    check("tai_lieu_nguon_du_cap", sql`(${t.nguonLoai} is null) = (${t.nguonId} is null)`),
+    index("tai_lieu_theo_ky").on(t.ky),
+  ],
+);
+
+/* ═══════════════════ khoá kỳ và nhật ký — quyết định 5.3 ══════════════════ */
+
+/**
+ * Nộp tờ khai tháng 6 xong mà ai đó sửa một dòng tháng 6 thì số trong hệ thống
+ * không còn khớp tờ khai đã nộp, và KHÔNG có gì báo.
+ *
+ * Với sản phẩm chạy hai sổ, phần chênh giữa sổ quản trị và sổ thuế chỉ có nghĩa
+ * khi biết nó được chốt ở thời điểm nào.
+ */
+export const kyKeToan = pgTable(
+  "ky_ke_toan",
+  {
+    ky: text("ky").primaryKey(),
+    trangThai: text("trang_thai").notNull().default("mo"),
+    khoaLuc: timestamp("khoa_luc", { withTimezone: true }),
+    khoaBoiId: uuid("khoa_boi_id").references(() => nguoiDung.id, { onDelete: "set null" }),
+    ghiChu: text("ghi_chu"),
+    taoLuc: taoLuc(),
+  },
+  (t) => [
+    kyCheck("ky_ke_toan", "ky"),
+    check("ky_trang_thai_hop_le", sql`${t.trangThai} in ('mo','dang_chot','da_khoa')`),
+    // Đã khoá thì phải biết ai khoá và khoá lúc nào — cùng lý do với `da_duyet`.
     check(
-      "tai_lieu_nguon_du_cap",
-      sql`(${t.nguonLoai} is null) = (${t.nguonId} is null)`,
+      "ky_khoa_du_dau_vet",
+      sql`${t.trangThai} <> 'da_khoa' or (${t.khoaLuc} is not null and ${t.khoaBoiId} is not null)`,
     ),
+  ],
+);
+
+/**
+ * Append-only. Lời hứa "mọi con số truy được về chứng từ" mới chỉ đúng theo
+ * chiều *bản ghi → chứng từ gốc*; bảng này lo chiều còn lại — *con số hôm nay
+ * từng là gì*. Với hai sổ, chiều thứ hai mới là chiều người ta hỏi khi có chuyện.
+ *
+ * Cưỡng chế append-only bằng RULE ở tầng DB, viết tay trong migration 0003 —
+ * drizzle không sinh được RULE.
+ */
+export const nhatKyThayDoi = pgTable(
+  "nhat_ky_thay_doi",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    bang: text("bang").notNull(),
+    banGhiId: uuid("ban_ghi_id").notNull(),
+    hanhDong: text("hanh_dong").notNull(),
+    truoc: jsonb("truoc"),
+    sau: jsonb("sau"),
+    nguoiDungId: uuid("nguoi_dung_id").references(() => nguoiDung.id, { onDelete: "set null" }),
+    taoLuc: taoLuc(),
+  },
+  (t) => [
+    check("nhat_ky_hanh_dong_hop_le", sql`${t.hanhDong} in ('them','sua','xoa')`),
+    // Thêm thì chưa có trạng thái trước; xoá thì không có trạng thái sau.
+    check("nhat_ky_them_khong_co_truoc", sql`${t.hanhDong} <> 'them' or ${t.truoc} is null`),
+    check("nhat_ky_xoa_khong_co_sau", sql`${t.hanhDong} <> 'xoa' or ${t.sau} is null`),
+    index("nhat_ky_theo_ban_ghi").on(t.bang, t.banGhiId),
   ],
 );
 

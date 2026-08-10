@@ -495,3 +495,54 @@ Khi thực hiện: `ho_ten` → `'Đã ẩn danh'`, `dien_thoai`/`email`/`ngay_s
 
 **Sau migration `0003`, lược đồ đi từ 32 lên khoảng 37 bảng** và không còn vấn đề mức A
 nào. Đây là bản chốt để bắt đầu GĐ2.
+
+---
+
+## 6. Kết quả — đã chạy 10/08/2026
+
+Migration `0003_them_so_thu_chi` + `0004_don_bang_tam` đã lên Neon.
+
+| | Trước | Sau |
+|---|---|---|
+| Bảng | 32 | **36** |
+| Ràng buộc `CHECK` | 53 | **79** |
+| Khoá ngoại | 23 | **31** |
+| Bảng thiếu khoá chính | 1 | **0** |
+| Cột `*_id` thiếu FK | 4 | **0** |
+
+Toàn bộ A1–A4, B1–B5 và C1–C6 đã xong. `doanh_thu_phan_loai` đã xoá.
+
+### Kiểm bằng cách thử phá, không bằng cách đọc lại
+
+Mỗi dòng dưới đây là một lệnh `INSERT` cố tình sai, chạy thật trên Neon:
+
+```
+✓ khoan_thu kỳ 'T7/2026'                        → chặn: khoan_thu_ky_dung_dinh_dang
+✓ khoan_thu diện thuế bịa 'gtgt_8'              → chặn: khoan_thu_dien_hop_le
+✓ khoan_thu số tiền âm                          → chặn: khoan_thu_so_tien_duong
+✓ khoan_thu nguồn 'thu_hoc_phi' mà thiếu nguon_id → chặn: khoan_thu_nguon_du_cap
+✓ giao_dich_ngan_hang thiếu chiều vào/ra         → chặn: NOT NULL
+✓ ky_ke_toan 'da_khoa' mà không ghi ai khoá      → chặn: ky_khoa_du_dau_vet
+```
+
+Và nhật ký kiểm toán:
+
+```
+✓ ghi thêm được
+✓ SỬA  → chặn: "nhat_ky_thay_doi chỉ được ghi thêm — không sửa, không xoá"
+✓ XOÁ  → chặn: cùng thông báo
+```
+
+### Hai ghi chú cho người sau
+
+**Trigger append-only viết tay trong `0003_*.sql`.** Drizzle không sinh được, và mọi
+lần `drizzle-kit generate` sau đều không đụng tới nó. Dùng `TRIGGER` chứ không dùng
+`RULE ... DO INSTEAD NOTHING`: rule sẽ **lặng lẽ nuốt** lệnh sửa, tức code tưởng đã sửa
+xong mà thực tế không có gì xảy ra. Một nhật ký kiểm toán im lặng bỏ qua lệnh ghi thì
+tệ hơn là không có nhật ký.
+
+**Vì sao có `0004`.** `drizzle-kit` không phân biệt được "đổi tên cột" với "xoá cột rồi
+thêm cột khác" nên nó dừng lại hỏi — mà lệnh sinh migration chạy không có TTY. Đường
+thoát duy nhất còn lại là xoá sạch lược đồ dựng lại, tức **phá một database đang chạy
+để né một câu hỏi**. Thay vào đó: `0003` giữ cột cũ một nhịp, `0004` xoá nó khi không
+còn gì để đoán. Gặp lại tình huống này thì làm y như vậy.
