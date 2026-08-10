@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BoltIcon, ChartIcon, HomeIcon, SettingsIcon, StaffIcon, UsersIcon } from "./icons";
+import { BoltIcon, ChartIcon, HomeIcon, ReceiptIcon, SettingsIcon, StaffIcon, UsersIcon } from "./icons";
 
 /**
  * Chỉ liệt kê trang ĐÃ CÓ. Mục `sapCo` hiện mờ và không bấm được — nói thật là
@@ -10,11 +10,12 @@ import { BoltIcon, ChartIcon, HomeIcon, SettingsIcon, StaffIcon, UsersIcon } fro
  */
 const MUC = [
   { nhan: "Trang chủ", icon: HomeIcon, href: "/dashboard" },
+  { nhan: "Kho tài liệu", icon: ReceiptIcon, href: "/dashboard/tai-lieu" },
   { nhan: "Cài đặt", icon: SettingsIcon, href: "/dashboard/settings" },
-  { nhan: "Giáo viên · thù lao", icon: StaffIcon, sapCo: "GĐ1" },
-  { nhan: "Học viên · học phí", icon: UsersIcon, sapCo: "GĐ3" },
-  { nhan: "Hồ sơ TT29 · nghĩa vụ", icon: ChartIcon, sapCo: "GĐ5" },
-  { nhan: "Tự động hoá", icon: BoltIcon, sapCo: "GĐ5" },
+  { nhan: "Sổ thu chi", icon: ChartIcon, sapCo: "GĐ2" },
+  { nhan: "Giáo viên · thù lao", icon: StaffIcon, sapCo: "GĐ3" },
+  { nhan: "Học viên · học phí", icon: UsersIcon, sapCo: "GĐ5" },
+  { nhan: "Tự động hoá", icon: BoltIcon, sapCo: "GĐ7" },
 ];
 
 export default function Sidebar() {
