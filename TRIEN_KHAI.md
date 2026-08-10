@@ -216,6 +216,71 @@ nhánh và point-in-time restore đều nằm trong gói miễn phí.
 
 ---
 
+---
+
+## E. Railway — nếu thử đường này
+
+Railway chạy **một container**, tự cấp HTTPS và một địa chỉ `*.up.railway.app`.
+Nghĩa là `docker-compose.yml`, `Caddyfile`, DuckDNS và cả việc mở cổng đều
+**không dùng đến** — chúng chỉ dành cho đường máy ảo ở trên.
+
+### E1. Lỗi `Railpack could not determine how to build the app`
+
+Railpack quét **thư mục gốc của repo**, mà ở gốc không có `package.json` nào —
+ứng dụng nằm trong `web/`. Sửa bằng một ô trong giao diện:
+
+> Service → **Settings** → **Source** → **Root Directory** = `web`
+
+Đặt xong, Railway tìm thấy `web/Dockerfile` và dùng nó thay cho Railpack. Kèm
+theo đó `web/railway.json` ghim sẵn builder là `DOCKERFILE` và đường kiểm sức
+khoẻ `/api/health`, để Railpack không giành lại quyền dựng.
+
+Bối cảnh build lúc đó là `web/`, đúng như `Dockerfile` giả định
+(`COPY package.json package-lock.json ./`). Đừng để Root Directory ở `/` rồi
+trỏ `RAILWAY_DOCKERFILE_PATH=web/Dockerfile` — đường dẫn đúng nhưng bối cảnh sai,
+và lỗi sẽ là "không tìm thấy package.json", khó lần hơn nhiều.
+
+### E2. Biến môi trường
+
+Đặt trong Variables của service, **sáu biến** — giống `.env.example` nhưng
+**bỏ `TEN_MIEN`** (Railway tự lo tên miền và chứng chỉ):
+
+```
+DATABASE_URL  JWT_SECRET  S3_ENDPOINT  S3_BUCKET  S3_ACCESS_KEY_ID  S3_SECRET_ACCESS_KEY
+```
+
+Không cần đặt `PORT` — Railway tự tiêm, và `server.js` đọc đúng biến đó.
+
+### E3. Hai việc vẫn phải làm
+
+Giống hệt đường máy ảo, không bỏ được cái nào:
+
+- `npm run db:migrate` **từ máy anh** (mục C3)
+- Thêm địa chỉ Railway vào **CORS của bucket R2** (mục C6), nếu không thì mọi
+  thứ chạy trừ tải file lên
+
+### E4. Tiền, và một chỗ phải tự xác minh
+
+| | Thực tế |
+|---|---|
+| Dùng thử | 5 USD tín dụng một lần, 30 ngày |
+| Gói Free sau đó | **1 USD tín dụng/tháng** — mà một service nhỏ nhất chạy liên tục đã tốn ~0,8–1 USD/tháng |
+| Hobby | 5 USD/tháng (~130k) |
+| Pro | 20 USD/tháng (~500k) |
+
+Gói Free **không dùng được cho một đợt thử kéo dài nhiều tuần**: chi phí bám sát
+đúng mức tín dụng, nên hết tiền giữa tháng là service dừng — và khách mở link
+vào đúng lúc đó thì không có cách nào giải thích.
+
+⚠️ **Phải tự xác minh trước khi chọn Railway:** có nguồn nói gói **Hobby cũng chỉ
+cho dùng phi thương mại**, thương mại thì phải lên Pro — tức đúng cái bẫy của
+Vercel Hobby, chỉ khác logo. Tài liệu giá của Railway *không* nói vậy, nhưng
+điều khoản ràng buộc là trang HTML dựng bằng JavaScript nên chưa đọc được nguyên
+văn. **Hỏi thẳng Railway trước khi đưa sản phẩm cho khách.** Nếu đúng là phi
+thương mại thì Railway = 500k/tháng, đắt hơn máy ảo, và mất luôn lý do chọn nó.
+
+---
+
 ## Việc còn nợ, ghi ở đây để khỏi quên
 
 - **Nhánh Neon riêng cho test.** Bộ ma trận phân quyền tạo ba tài khoản
