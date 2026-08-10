@@ -14,30 +14,14 @@
 
 import { randomUUID } from "node:crypto";
 import jwt from "jsonwebtoken";
+import { layKhoaKy } from "@/server/moiTruong";
 
 export const COOKIE_NAME = "anser_hsa_token";
 export const THOI_HAN_PHIEN_NGAY = 7;
 
-/** Đủ dài để HS256 không phải là chỗ yếu nhất. 48 byte base64url ≈ 64 ký tự. */
-const DO_DAI_TOI_THIEU = 32;
-
-function layKhoa(): string {
-  const khoa = process.env.JWT_SECRET;
-  if (!khoa) {
-    throw new Error(
-      "Thiếu JWT_SECRET. Sinh khoá rồi đặt vào .env.local:\n" +
-        '  node -e "console.log(require(\'crypto\').randomBytes(48).toString(\'base64url\'))"',
-    );
-  }
-  if (khoa.length < DO_DAI_TOI_THIEU) {
-    throw new Error(`JWT_SECRET quá ngắn (${khoa.length} ký tự, cần ≥ ${DO_DAI_TOI_THIEU}).`);
-  }
-  // Chuỗi fallback của Body. Nếu ai đó copy sang thì chặn ngay tại đây.
-  if (khoa === "dev-secret-change-me") {
-    throw new Error("JWT_SECRET đang là chuỗi mẫu công khai. Sinh khoá thật.");
-  }
-  return khoa;
-}
+// Phần kiểm khoá nằm ở `moiTruong.ts` — module đó không import gì, nên
+// `instrumentation.ts` dùng được mà không kéo `jsonwebtoken` vào bundle edge.
+const layKhoa = layKhoaKy;
 
 export type NoiDungToken = { sub: string; jti: string };
 

@@ -2,9 +2,13 @@ export async function register() {
   if (process.env.NEXT_RUNTIME !== "nodejs") return;
 
   // Thiếu JWT_SECRET thì dừng ngay tại đây, không để app chạy tiếp rồi ký token
-  // bằng một khoá mặc định. Import động để lỗi ném ra lúc khởi động, có ngữ cảnh.
-  const { kyToken } = await import("@/server/auth");
-  kyToken("00000000-0000-0000-0000-000000000000");
+  // bằng một khoá mặc định.
+  //
+  // Gọi `moiTruong` chứ KHÔNG gọi `auth`: file này được biên dịch cho cả runtime
+  // edge, và kéo `jsonwebtoken` vào đó là `require('crypto')` không phân giải
+  // được → instrumentation hỏng → MỌI route trả 500, kể cả /api/health.
+  const { layKhoaKy } = await import("@/server/moiTruong");
+  layKhoaKy();
 
   const { gieoTaiKhoanDemo } = await import("@/server/store/users");
   const { baoDamDongCaiDat } = await import("@/server/store/settings");
