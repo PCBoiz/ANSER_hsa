@@ -254,21 +254,50 @@ phải trông máy — là thật và với một người làm một mình thì
 là tiền; nhưng nó không còn là *phương án rẻ*, mà là *phương án trả thêm tiền để đỡ
 việc*. Đó là một quyết định khác hẳn.
 
-Chỗ này **không tự quyết**, vì nó là tiền của anh và là rủi ro điều khoản của anh.
-Ba đường:
+Tên miền **không** phải khoản riêng của VPS — Vercel Pro cũng không kèm tên miền, nên
+nó triệt tiêu khỏi phép so sánh. Cộng đủ mọi khoản (compute, tên miền `.com.vn`
+~30k/tháng, HTTPS, CDN, Neon, R2) thì Vercel Pro ~530k/tháng, VPS ~190k/tháng. Bốn
+khoản cuối hoặc miễn phí, hoặc giống hệt nhau ở cả hai bên.
 
-1. **Hobby cho giai đoạn nháp, đổi khi ký hợp đồng.** Rẻ nhất, nhưng theo câu chữ
-   trên thì đã lệch điều khoản ngay từ bây giờ chứ không phải từ lúc ký. Rủi ro thực
-   tế thấp (Vercel hiếm khi soi dự án nhỏ, và chế tài là yêu cầu nâng gói) nhưng
-   không bằng không.
-2. **Pro ngay.** Sạch điều khoản, ~500k/tháng, đắt gấp đôi VPS.
-3. **VPS luôn.** Rẻ nhất trong các phương án hợp lệ, và anh đã có sẵn kinh nghiệm
-   dựng Docker cho n8n. Mất công dựng và trông máy.
+Một điều làm con số VPS thật hơn bình thường: **VPS này không giữ dữ liệu gì cả.**
+Database ở Neon, file ở R2. Mất VPS là dựng lại, không phải mất dữ liệu — khoản chi
+phí ẩn lớn nhất của VPS ở kiến trúc này bằng không.
 
-Một điểm nữa đáng nói: **kiến trúc hiện tại chạy y hệt trên cả hai.** Việc chọn URL
-ký sẵn để tải thẳng lên R2 (mục 2.1) vốn là để né trần 4,5MB của Vercel, nhưng nó
-cũng đúng trên VPS. Nên quyết định này **không khoá anh vào đâu cả** và hoãn được
-đến lúc có hợp đồng — miễn là biết rõ Hobby không phải cửa miễn phí lâu dài.
+#### Đã thử Cloudflare Workers, và đã loại
+
+Cloudflare **cho phép dùng thương mại ngay ở gói free**, R2 vốn đã là Cloudflare, nên
+trên giấy nó là phương án hợp lệ rẻ nhất. Đã dựng thật và chạy thật trên workerd
+*(nhánh `thu-cloudflare`, chi tiết ở `web/CLOUDFLARE.md`)*:
+
+| Rủi ro | Kết quả |
+|---|---|
+| `jsonwebtoken`/`bcryptjs` cần `node:crypto` | **đạt** — `nodejs_compat` đủ |
+| Trần 3 MiB gzip gói free | **đạt sát nút** — 2.66/3 MiB, dư 11% |
+| Driver Neon + `db.transaction()` | **hỏng** — chặn hẳn |
+
+Workers cấm dùng lại đối tượng I/O giữa hai yêu cầu, mà `db` là một `Pool` WebSocket
+**ở phạm vi module** — đúng thứ bị cấm. Mọi đường đụng DB đều 500 sau yêu cầu đầu
+tiên; mọi đường không đụng DB vẫn sống.
+
+Sửa được, nhưng phải đổi `db` thành thứ lấy theo ngữ cảnh yêu cầu: **15 module** import
+`db`, **15 lời gọi `db.transaction()`** ở 6 module store. Đường tắt `neon-http` thì mất
+giao dịch tương tác — tức đánh đổi đúng thứ vừa làm ở 1.5 và 1.7. Không đáng, để tiết
+kiệm ~130k/tháng.
+
+#### Còn lại hai đường
+
+1. **VPS ~190k/tháng, tất cả các khoản.** Rẻ nhất trong các phương án hợp lệ. Chạy
+   Node thật nên pool phạm vi module và giao dịch tương tác đều đúng — **không phải
+   sửa một dòng nào**.
+2. **Vercel Pro ~530k/tháng.** Đắt gần gấp ba, đổi lại không phải trông máy.
+
+**Đề xuất: VPS.** Không phải vì rẻ hơn, mà vì lần thử Cloudflare vừa rồi cho thấy tầng
+dữ liệu của sản phẩm này gắn chặt với runtime Node — và VPS là nơi duy nhất trong ba
+phương án mà điều đó không phải trả giá gì.
+
+Và **kiến trúc hiện tại chạy y hệt trên cả hai đường còn lại.** URL ký sẵn tải thẳng
+lên R2 (mục 2.1) vốn dựng để né trần 4,5MB của Vercel, nhưng nó cũng đúng trên VPS.
+Nên quyết định này không khoá vào đâu cả, hoãn được đến lúc có hợp đồng.
 
 ### 2.4. Test phân quyền đang chạy trên chính database thật
 
@@ -309,6 +338,7 @@ Next.js cần nó.
 2. ~~Màn hình Kỳ kế toán~~ — **xong**, và chính nó làm lộ lỗi 1.5
 3. ~~Bọc giao dịch cho các đường ghi còn lại~~ — **xong** (1.7)
 4. ~~Dọn object mồ côi~~ — **xong** (1.8)
-5. **Anh chọn hạ tầng** (2.3) — việc duy nhất đang chờ quyết định, không phải chờ mã
-6. Nhánh Neon riêng cho test, trước khi có dữ liệu thật đầu tiên (2.4)
-7. Phủ ma trận phân quyền cho nhóm `automation/rules/[id]/*` còn lại
+5. ~~Thử Cloudflare Workers~~ — **xong**, đã loại (2.3, `web/CLOUDFLARE.md`)
+6. **Anh chốt VPS hay Vercel Pro** (2.3) — việc duy nhất đang chờ quyết định, không phải chờ mã
+7. Nhánh Neon riêng cho test, trước khi có dữ liệu thật đầu tiên (2.4)
+8. Phủ ma trận phân quyền cho nhóm `automation/rules/[id]/*` còn lại
