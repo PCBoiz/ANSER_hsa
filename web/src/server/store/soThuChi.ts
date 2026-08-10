@@ -72,22 +72,23 @@ export async function ghiKhoanThu(cac: DongThuMoi[], nguoiDungId: string): Promi
   const kem = cac.map((d) => ({ ...d, ky: kyCua(d.ngay) }));
   await chanNeuKhoa([...new Set(kem.map((d) => d.ky))]);
 
-  const rows = await db
-    .insert(khoanThu)
-    .values(
-      kem.map((d) => ({
-        ngay: d.ngay,
-        ky: d.ky,
-        soTien: d.soTien,
-        moTa: d.moTa ?? null,
-        dienThue: d.dienThue ?? "chua_quyet",
-        dienKeKhai: d.dienKeKhai ?? "chua_quyet",
-      })),
-    )
-    .returning();
-
-  for (const r of rows) await ghiNhatKy("khoan_thu", r.id, "them", nguoiDungId, undefined, r);
-  return rows;
+  return db.transaction(async (tx) => {
+    const rows = await tx
+      .insert(khoanThu)
+      .values(
+        kem.map((d) => ({
+          ngay: d.ngay,
+          ky: d.ky,
+          soTien: d.soTien,
+          moTa: d.moTa ?? null,
+          dienThue: d.dienThue ?? "chua_quyet",
+          dienKeKhai: d.dienKeKhai ?? "chua_quyet",
+        })),
+      )
+      .returning();
+    for (const r of rows) await ghiNhatKy("khoan_thu", r.id, "them", nguoiDungId, undefined, r, tx);
+    return rows;
+  });
 }
 
 export async function ghiKhoanChi(cac: DongChiMoi[], nguoiDungId: string): Promise<KhoanChi[]> {
@@ -95,31 +96,34 @@ export async function ghiKhoanChi(cac: DongChiMoi[], nguoiDungId: string): Promi
   const kem = cac.map((d) => ({ ...d, ky: kyCua(d.ngay) }));
   await chanNeuKhoa([...new Set(kem.map((d) => d.ky))]);
 
-  const rows = await db
-    .insert(khoanChi)
-    .values(
-      kem.map((d) => ({
-        ngay: d.ngay,
-        ky: d.ky,
-        soTien: d.soTien,
-        moTa: d.moTa ?? null,
-        nhom: d.nhom,
-        duocTru: d.duocTru ?? false,
-        lyDoKhongTru: d.lyDoKhongTru ?? null,
-      })),
-    )
-    .returning();
-
-  for (const r of rows) await ghiNhatKy("khoan_chi", r.id, "them", nguoiDungId, undefined, r);
-  return rows;
+  return db.transaction(async (tx) => {
+    const rows = await tx
+      .insert(khoanChi)
+      .values(
+        kem.map((d) => ({
+          ngay: d.ngay,
+          ky: d.ky,
+          soTien: d.soTien,
+          moTa: d.moTa ?? null,
+          nhom: d.nhom,
+          duocTru: d.duocTru ?? false,
+          lyDoKhongTru: d.lyDoKhongTru ?? null,
+        })),
+      )
+      .returning();
+    for (const r of rows) await ghiNhatKy("khoan_chi", r.id, "them", nguoiDungId, undefined, r, tx);
+    return rows;
+  });
 }
 
 export async function xoaKhoanThu(id: string, nguoiDungId: string) {
   const [cu] = await db.select().from(khoanThu).where(eq(khoanThu.id, id)).limit(1);
   if (!cu) return false;
   await chanNeuKhoa([cu.ky]);
-  await db.delete(khoanThu).where(eq(khoanThu.id, id));
-  await ghiNhatKy("khoan_thu", id, "xoa", nguoiDungId, cu, undefined);
+  await db.transaction(async (tx) => {
+    await tx.delete(khoanThu).where(eq(khoanThu.id, id));
+    await ghiNhatKy("khoan_thu", id, "xoa", nguoiDungId, cu, undefined, tx);
+  });
   return true;
 }
 
@@ -127,8 +131,10 @@ export async function xoaKhoanChi(id: string, nguoiDungId: string) {
   const [cu] = await db.select().from(khoanChi).where(eq(khoanChi.id, id)).limit(1);
   if (!cu) return false;
   await chanNeuKhoa([cu.ky]);
-  await db.delete(khoanChi).where(eq(khoanChi.id, id));
-  await ghiNhatKy("khoan_chi", id, "xoa", nguoiDungId, cu, undefined);
+  await db.transaction(async (tx) => {
+    await tx.delete(khoanChi).where(eq(khoanChi.id, id));
+    await ghiNhatKy("khoan_chi", id, "xoa", nguoiDungId, cu, undefined, tx);
+  });
   return true;
 }
 
@@ -149,15 +155,16 @@ export async function danhDauKeKhai(
   if (cu.length === 0) return 0;
   await chanNeuKhoa([...new Set(cu.map((r) => r.ky))]);
 
-  const moi = await db
-    .update(khoanThu)
-    .set({ dienKeKhai: dien })
-    .where(inArray(khoanThu.id, ids))
-    .returning();
-
   const banCu = new Map(cu.map((r) => [r.id, r]));
-  for (const r of moi) await ghiNhatKy("khoan_thu", r.id, "sua", nguoiDungId, banCu.get(r.id), r);
-  return moi.length;
+  return db.transaction(async (tx) => {
+    const moi = await tx
+      .update(khoanThu)
+      .set({ dienKeKhai: dien })
+      .where(inArray(khoanThu.id, ids))
+      .returning();
+    for (const r of moi) await ghiNhatKy("khoan_thu", r.id, "sua", nguoiDungId, banCu.get(r.id), r, tx);
+    return moi.length;
+  });
 }
 
 /* ─────────────────────────────────────────────────────── đọc sổ ───── */

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import DoiChieuKho from "@/components/dashboard/DoiChieuKho";
 import TaiLenTaiLieu from "@/components/dashboard/TaiLenTaiLieu";
 import { bienConThieu, khoCauHinhChua } from "@/server/luuTru/kho";
 import { yeuCauVaiTro } from "@/server/session";
@@ -46,6 +47,8 @@ export default async function TrangTaiLieu() {
       )}
 
       <TaiLenTaiLieu duocTaiHopDong={laQuanLy} />
+
+      {laQuanLy && khoCauHinhChua() && <DoiChieuKho />}
 
       {ds.length === 0 ? (
         <p className="rounded-xl border border-white/10 bg-white/[0.02] p-8 text-center text-sm text-white/40">

@@ -35,14 +35,16 @@ export async function datTrangThai(
     ghiChu: ghiChu ?? null,
     capNhatLuc: new Date(),
   };
-  if (co) {
-    const r = await db.update(hoSoTt29).set(gia).where(eq(hoSoTt29.muc, muc)).returning();
-    await ghiNhatKy("ho_so_tt29", r[0].id, "sua", nguoiDungId, co, r[0]);
+  return db.transaction(async (tx) => {
+    if (co) {
+      const r = await tx.update(hoSoTt29).set(gia).where(eq(hoSoTt29.muc, muc)).returning();
+      await ghiNhatKy("ho_so_tt29", r[0].id, "sua", nguoiDungId, co, r[0], tx);
+      return r[0];
+    }
+    const r = await tx.insert(hoSoTt29).values({ muc, ...gia }).returning();
+    await ghiNhatKy("ho_so_tt29", r[0].id, "them", nguoiDungId, undefined, r[0], tx);
     return r[0];
-  }
-  const r = await db.insert(hoSoTt29).values({ muc, ...gia }).returning();
-  await ghiNhatKy("ho_so_tt29", r[0].id, "them", nguoiDungId, undefined, r[0]);
-  return r[0];
+  });
 }
 
 /**
@@ -90,24 +92,28 @@ export async function soi(): Promise<{ ketQua: KetQuaSoi; hoSo: DongHoSo[]; duLi
 
 /** Đánh dấu toàn bộ giáo viên là đã có trong danh sách công khai. */
 export async function danhDauCongKhaiTatCaGiaoVien(nguoiDungId: string | null = null) {
-  const r = await db
-    .update(giaoVien)
-    .set({ congKhaiDanhSach: true })
-    .where(eq(giaoVien.congKhaiDanhSach, false))
-    .returning();
-  for (const g of r) await ghiNhatKy("giao_vien", g.id, "sua", nguoiDungId, undefined, g);
-  return r.length;
+  return db.transaction(async (tx) => {
+    const r = await tx
+      .update(giaoVien)
+      .set({ congKhaiDanhSach: true })
+      .where(eq(giaoVien.congKhaiDanhSach, false))
+      .returning();
+    for (const g of r) await ghiNhatKy("giao_vien", g.id, "sua", nguoiDungId, undefined, g, tx);
+    return r.length;
+  });
 }
 
 /** Ghi nhận một giáo viên trường công đã báo cáo hiệu trưởng. */
 export async function ghiNhanBaoCaoHieuTruong(giaoVienId: string, nguoiDungId: string | null = null) {
-  const r = await db
-    .update(giaoVien)
-    .set({ daBaoCaoHieuTruong: true })
-    .where(eq(giaoVien.id, giaoVienId))
-    .returning();
-  if (r[0]) await ghiNhatKy("giao_vien", r[0].id, "sua", nguoiDungId, undefined, r[0]);
-  return r[0];
+  return db.transaction(async (tx) => {
+    const r = await tx
+      .update(giaoVien)
+      .set({ daBaoCaoHieuTruong: true })
+      .where(eq(giaoVien.id, giaoVienId))
+      .returning();
+    if (r[0]) await ghiNhatKy("giao_vien", r[0].id, "sua", nguoiDungId, undefined, r[0], tx);
+    return r[0];
+  });
 }
 
 /** Giáo viên trường công chưa báo cáo — danh sách để đi hỏi từng người. */

@@ -31,16 +31,18 @@ export async function capNhatCaiDatCongTy(
     throw new Error("Vùng lương tối thiểu phải là 1, 2, 3 hoặc 4.");
   }
   const hienTai = await baoDamDongCaiDat();
-  const rows = await db
-    .update(caiDatCongTy)
-    .set({ ...patch, capNhatLuc: new Date() })
-    .where(eq(caiDatCongTy.id, hienTai.id))
-    .returning();
-  // Vùng lương tối thiểu quyết định sàn đóng BHXH; chu kỳ khai thuế quyết định
-  // mọi mốc trong lịch nghĩa vụ. Đổi hai thứ này là đổi kết quả của mọi bảng
-  // tính sau đó — phải biết ai đổi, từ gì sang gì.
-  if (patch.vungLuongToiThieu !== undefined || patch.khaiThueTheo !== undefined) {
-    await ghiNhatKy("cai_dat_cong_ty", hienTai.id, "sua", nguoiDungId, hienTai, rows[0]);
-  }
-  return rows[0];
+  return db.transaction(async (tx) => {
+    const rows = await tx
+      .update(caiDatCongTy)
+      .set({ ...patch, capNhatLuc: new Date() })
+      .where(eq(caiDatCongTy.id, hienTai.id))
+      .returning();
+    // Vùng lương tối thiểu quyết định sàn đóng BHXH; chu kỳ khai thuế quyết định
+    // mọi mốc trong lịch nghĩa vụ. Đổi hai thứ này là đổi kết quả của mọi bảng
+    // tính sau đó — phải biết ai đổi, từ gì sang gì.
+    if (patch.vungLuongToiThieu !== undefined || patch.khaiThueTheo !== undefined) {
+      await ghiNhatKy("cai_dat_cong_ty", hienTai.id, "sua", nguoiDungId, hienTai, rows[0], tx);
+    }
+    return rows[0];
+  });
 }

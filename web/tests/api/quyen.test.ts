@@ -93,6 +93,9 @@ const MA_TRAN: [string, string, VaiTro, unknown?][] = [
   ["GET", "/api/thu-lao", "ke_toan"],
   ["POST", "/api/thu-lao", "quan_ly", {}],
   ["GET", "/api/tai-lieu", "ke_toan"],
+  // Chỉ GET. POST của đường này XOÁ FILE THẬT, mà ma trận thì gọi cả chiều "đủ
+  // quyền" — nên nó được kiểm riêng ở dưới, chỉ đúng chiều bị chặn.
+  ["GET", "/api/tai-lieu/doi-chieu-kho", "quan_ly"],
   ["GET", "/api/tt29", "ke_toan"],
   ["PATCH", "/api/tt29", "quan_ly", { muc: "khong_ton_tai" }],
   ["GET", "/api/du-lieu-mau", "ke_toan"],
@@ -159,6 +162,17 @@ describe.skipIf(bo)("rò rỉ qua đường khác", () => {
 
   it("/api/health vẫn mở — cần cho giám sát", async () => {
     expect((await goi("/api/health", { vaiTro: "khach" })).status).toBe(200);
+  });
+
+  /**
+   * Dọn kho là thao tác XOÁ FILE. Chỉ kiểm chiều bị chặn — gọi thử chiều đủ
+   * quyền là thật sự xoá, và một test không được phép làm việc đó.
+   */
+  it("dọn kho: kế toán và dưới đều bị chặn 403", async () => {
+    for (const vt of ["khach", "tro_giang", "ke_toan"] as const) {
+      const res = await goi("/api/tai-lieu/doi-chieu-kho", { method: "POST", vaiTro: vt });
+      expect([401, 403], `POST dọn kho với ${vt}`).toContain(res.status);
+    }
   });
 });
 

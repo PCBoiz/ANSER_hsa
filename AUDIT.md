@@ -7,9 +7,14 @@
 
 ```
 36 bảng · 79 ràng buộc CHECK · 31 khoá ngoại
-28 file route API · 34 đường (method × path)
-241 test: 127 hàm thuần + 114 ma trận phân quyền chạy trên server sống
+32 file route API · 51 đường (method × path)
+265 test: 145 hàm thuần + 120 chạy trên server sống
 ```
+
+> Con số route ở bản audit đầu (*28 file · 34 đường*) đếm thiếu — nay đếm lại bằng
+> `find` và `grep` trên chính thư mục `src/app/api`. Ma trận phân quyền phủ **22
+> đường × 4 vai trò**, tức chưa phải toàn bộ 51; phần chưa phủ chủ yếu là nhóm
+> `automation/rules/[id]/*` thừa kế từ khung Body.
 
 Trước audit, **toàn bộ 104 test phân quyền không tồn tại** — mọi kiểm tra API đều là
 `curl` tay rồi xoá đi. Đó là phát hiện lớn nhất, và cũng là thứ đã sửa đầu tiên.
@@ -86,14 +91,64 @@ Hai chỗ sửa, và chỗ thứ hai mới là chỗ đáng:
    `ghiNhatKy` nhận thêm tham số `tx`. Một nhật ký kiểm toán mà có thể vắng mặt
    đúng lúc thay đổi xảy ra thì nó không phải nhật ký kiểm toán.
 
-*Còn nợ:* mới bọc giao dịch cho `datTrangThaiKy` — chỗ lỗi lộ ra. Các đường ghi
-khác (`ghiKhoanThu`, `chotThuLao`, `datTrangThai` của TT29…) vẫn tách rời hai
-bước. Chúng không gặp lỗi kiểu dữ liệu nữa nên không còn vỡ, nhưng nếu nhật ký
-hỏng vì lý do khác thì vẫn ghi một nửa. Mẫu sửa đã có sẵn, chỉ là chưa áp hết.
-
 ### 1.6. Ba file chết từ khung Body
 
 `BarChartCard.tsx`, `StatCard.tsx`, `server/n8n.ts` — không nơi nào import. Đã xoá.
+
+### 1.7. ~~Mười một đường ghi còn lại vẫn tách rời hai bước~~ — ĐÃ SỬA 10/08
+
+Nợ để lại từ 1.5: khi đó mới bọc giao dịch cho `datTrangThaiKy`, chỗ lỗi lộ ra.
+Nay **mọi lời gọi `ghiNhatKy` trong mã đều nhận `tx`** — kiểm bằng cách grep toàn
+bộ lời gọi và đọc từng cái, không còn cái nào chạy ngoài giao dịch.
+
+Nặng nhất là `chotThuLao`, vì nó làm **ba việc**: ghi bảng thù lao → gắn `thuLaoId`
+lên từng buổi dạy → ghi nhật ký. Đứt ở bước hai để lại một bảng tiền không biết
+gồm những buổi nào — đúng lỗi A4 mà migration `0003` vừa sửa xong, quay vào bằng
+cửa sau. Và số tiền đó là tiền sắp trả ra khỏi trung tâm.
+
+| Đường ghi | Số việc phải cùng sống hoặc cùng chết |
+|---|---|
+| `chotThuLao` | 3 — bảng thù lao, buổi dạy, nhật ký |
+| `huyThuLao` | 3 — nhả buổi, xoá bảng, nhật ký |
+| `ghiKhoanThu` / `ghiKhoanChi` | 2 — chèn n dòng, n dòng nhật ký |
+| `danhDauKeKhai` | 2 — cập nhật hàng loạt, n dòng nhật ký |
+| `xoaKhoanThu` / `xoaKhoanChi` | 2 |
+| `datTrangThai` (TT29) | 2 — tuyên bố pháp lý |
+| `danhDauCongKhaiTatCaGiaoVien` · `ghiNhanBaoCaoHieuTruong` | 2 |
+| `capNhatNguoiDung` / `xoaNguoiDung` | 2 |
+| `xoaTaiLieu` · `capNhatCaiDatCongTy` | 2 |
+
+### 1.8. ~~Object mồ côi trên R2~~ — ĐÃ XỬ LÝ 10/08
+
+Nợ để lại từ 2.1. Tải thẳng lên R2 tách đôi một việc vốn liền mạch: file lên kho ở
+bước hai, sổ ghi ở bước ba. Đứt giữa hai bước thì object nằm lại, vô hình, vẫn tính
+tiền lưu trữ — và nó là chứng từ có tên học viên nằm ngoài mọi danh sách kiểm.
+
+Lệch được **cả hai chiều**, và chỗ đáng nghĩ là hai chiều không đối xứng:
+
+| Chiều | Xử lý |
+|---|---|
+| Có file, không có sổ | rác — xoá được, **nhưng phải chờ** |
+| Có sổ, không có file | báo ra, **tuyệt đối không tự xoá dòng sổ** — dòng đó là bằng chứng từng có tài liệu; biết mình mất gì thì hơn là mất luôn cả việc biết |
+
+Cửa chờ mặc định 2 giờ. Điều kiện xoá là **giao** của hai vế — không có trong sổ
+**và** đã quá hạn chờ — vì nếu chỉ xét vế đầu thì file người ta đang đẩy dở lúc
+11h58 sẽ bị xoá đúng lúc 12h00 ai đó bấm dọn. `?gioCho=0` bị chặn ở cả tầng route
+lẫn tầng hàm thuần, rơi về mặc định chứ không nghe theo.
+
+*Kiểm thật, trên R2 thật:*
+
+| Dựng tình huống | Kết quả |
+|---|---|
+| Tải lên đủ ba bước | khớp=1, không báo lệch |
+| Đẩy lên rồi **không** xác nhận | vào nhóm "còn chờ", **không** vào nhóm mồ côi |
+| Bấm dọn ngay lập tức | xoá 0 file — file đang đẩy dở còn nguyên trên bucket |
+| Xoá file khỏi R2 **sau lưng** ứng dụng | báo đúng dòng "thiếu file", và dòng sổ vẫn còn |
+| Kế toán bấm dọn | 403 |
+
+*Chưa kiểm được đầu-cuối:* việc xoá một object đã **quá** cửa chờ — không đặt được
+`LastModified` lùi về quá khứ trên R2. Phần phân loại có 11 test thuần phủ mốc thời
+gian, còn lệnh xoá là đúng `xoaKhoiKho` mà nhánh 413 và 409 đã dùng và đã kiểm.
 
 ---
 
@@ -143,13 +198,18 @@ kế toán xin URL cho `chung_tu` — thứ họ được phép — rồi khai t
 nhận. Đường dẫn bị khoá cứng trong chữ ký nên đọc ngược từ đó là nguồn duy nhất tin
 được. `phanTichDuongDan` có 7 test riêng.
 
-**Còn lại một chuyện nhỏ:** trình duyệt đẩy xong rồi tắt tab trước khi xác nhận thì R2
-giữ một object không bản ghi nào trỏ tới. Nó vô hình và chỉ tốn vài KB, dọn được bằng
-một lượt đối chiếu khoá trên R2 với cột `duong_dan` — chưa làm.
+**Object mồ côi:** đã xử lý — xem 1.8.
 
-**Việc của anh:** bật CORS trên bucket `anser-hsa` với `AllowedOrigins` gồm
-`http://localhost:3000`. Chưa bật thì `curl` vẫn chạy (đã kiểm) nhưng trình duyệt sẽ
-từ chối — và giao diện nói đúng chỗ đó thay vì đổ lỗi cho server.
+**CORS trên bucket:** đã bật, và đã kiểm bằng cách mô phỏng đúng yêu cầu thăm dò mà
+trình duyệt gửi, chứ không chỉ nhìn ảnh chụp màn hình cấu hình:
+
+```
+OPTIONS với Origin: http://localhost:3000   →  204, Allow-Origin/Headers/Methods đủ ba
+OPTIONS với một origin lạ                    →  403, không header nào
+```
+
+Chiều thứ hai mới là chiều đáng kiểm: cấu hình cho phép **mọi** origin cũng trả 204
+cho origin đúng, nên chỉ thử origin đúng thì không phân biệt được.
 
 ### 2.2. 16/36 bảng chưa có dòng code nào đụng tới
 
@@ -166,7 +226,51 @@ viên hay bảng lương.
 cho phụ huynh thì chưa cần — nhưng ngày có đường đó, bảng này phải được đọc TRƯỚC mỗi
 lần gửi, không phải sau.
 
-### 2.3. Test phân quyền đang chạy trên chính database thật
+### 2.3. Vercel gói Hobby **không cho dùng thương mại** — bài toán chi phí lật ngược
+
+Lý do duy nhất chọn Vercel là *"giảm thiểu chi phí"*. Tra điều khoản thì lý do đó
+không đứng được.
+
+[Fair Use Guidelines](https://vercel.com/docs/limits/fair-use-guidelines) của Vercel
+định nghĩa dùng thương mại rất rộng: **bất kỳ deployment nào phục vụ lợi ích tài
+chính của bất kỳ ai tham gia vào việc tạo ra dự án — kể cả người viết mã được trả
+tiền.** Không phải "có thu tiền người dùng cuối" mới tính. Theo đúng câu chữ đó, một
+sản phẩm dựng để bán cho TOP HSA là thương mại **kể cả trong giai đoạn dùng thử chưa
+có hợp đồng**, vì người viết mã là bên hưởng lợi tài chính.
+
+Muốn hợp lệ thì phải lên [Pro: **20 USD/chỗ/tháng**](https://vercel.com/docs/plans/pro-plan)
+(kèm 20 USD tín dụng dùng và 1TB băng thông).
+
+Quy ra và đặt cạnh phương án đã gạt đi:
+
+| | VNĐ/tháng | Điều khoản |
+|---|---|---|
+| Vercel Hobby | 0 | **không được dùng cho dự án thương mại** |
+| Vercel Pro | ~500.000 | hợp lệ |
+| VPS | 150.000 – 250.000 | hợp lệ |
+
+**VPS rẻ hơn Vercel Pro 2–3 lần.** Cái được của Vercel — CI/CD, HTTPS, CDN, không
+phải trông máy — là thật và với một người làm một mình thì thời gian vận hành cũng
+là tiền; nhưng nó không còn là *phương án rẻ*, mà là *phương án trả thêm tiền để đỡ
+việc*. Đó là một quyết định khác hẳn.
+
+Chỗ này **không tự quyết**, vì nó là tiền của anh và là rủi ro điều khoản của anh.
+Ba đường:
+
+1. **Hobby cho giai đoạn nháp, đổi khi ký hợp đồng.** Rẻ nhất, nhưng theo câu chữ
+   trên thì đã lệch điều khoản ngay từ bây giờ chứ không phải từ lúc ký. Rủi ro thực
+   tế thấp (Vercel hiếm khi soi dự án nhỏ, và chế tài là yêu cầu nâng gói) nhưng
+   không bằng không.
+2. **Pro ngay.** Sạch điều khoản, ~500k/tháng, đắt gấp đôi VPS.
+3. **VPS luôn.** Rẻ nhất trong các phương án hợp lệ, và anh đã có sẵn kinh nghiệm
+   dựng Docker cho n8n. Mất công dựng và trông máy.
+
+Một điểm nữa đáng nói: **kiến trúc hiện tại chạy y hệt trên cả hai.** Việc chọn URL
+ký sẵn để tải thẳng lên R2 (mục 2.1) vốn là để né trần 4,5MB của Vercel, nhưng nó
+cũng đúng trên VPS. Nên quyết định này **không khoá anh vào đâu cả** và hoãn được
+đến lúc có hợp đồng — miễn là biết rõ Hobby không phải cửa miễn phí lâu dài.
+
+### 2.4. Test phân quyền đang chạy trên chính database thật
 
 Bộ test tạo ba tài khoản `kiemquyen-*@kiemthu.local` rồi xoá ở `afterAll`. Hiện DB
 chưa có dữ liệu thật nên an toàn. **Ngày có dữ liệu thật thì phải đổi sang một nhánh
@@ -201,7 +305,10 @@ Next.js cần nó.
 
 ## 4. Việc kế tiếp theo thứ tự
 
-1. Chốt cách xử lý trần 4,5MB (mục 2.1) trước khi đẩy lên Vercel
+1. ~~Chốt cách xử lý trần 4,5MB~~ — **xong** (2.1): ký sẵn, tải thẳng, kèm bước xác nhận
 2. ~~Màn hình Kỳ kế toán~~ — **xong**, và chính nó làm lộ lỗi 1.5
-3. Bọc giao dịch cho các đường ghi còn lại (xem cuối mục 1.5)
-4. Nhánh Neon riêng cho test, trước khi có dữ liệu thật đầu tiên
+3. ~~Bọc giao dịch cho các đường ghi còn lại~~ — **xong** (1.7)
+4. ~~Dọn object mồ côi~~ — **xong** (1.8)
+5. **Anh chọn hạ tầng** (2.3) — việc duy nhất đang chờ quyết định, không phải chờ mã
+6. Nhánh Neon riêng cho test, trước khi có dữ liệu thật đầu tiên (2.4)
+7. Phủ ma trận phân quyền cho nhóm `automation/rules/[id]/*` còn lại

@@ -172,30 +172,42 @@ export async function chotThuLao(giaoVienId: string, ky: string, nguoiDungId: st
   const khoa = await cacKyDangKhoa([ky]);
   if (khoa.length > 0) throw new KyDaKhoaError(khoa);
 
-  const [ban] = await db
-    .insert(thuLao)
-    .values({
-      giaoVienId,
-      ky,
-      tongTruocThue: xem.ketQua.tongTruocThue,
-      khauTruTncn: xem.ketQua.khauTruTncn,
-      thucNhan: xem.ketQua.thucNhan,
-      nguongApDung: xem.ketQua.nguongApDung,
-      coCamKet08: xem.coCamKet08,
-    })
-    .returning();
-
-  await db.update(buoiDay).set({ thuLaoId: ban.id }).where(inArray(buoiDay.id, xem.buoiIds));
-  // Số tiền sẽ trả ra khỏi trung tâm — phải biết ai chốt và chốt cái gì.
-  await ghiNhatKy("thu_lao", ban.id, "them", nguoiDungId, undefined, { ...ban, buoiIds: xem.buoiIds });
-  return ban;
+  /**
+   * Ba việc phải cùng sống hoặc cùng chết.
+   *
+   * Đây là chỗ nguy hiểm nhất trong cả sản phẩm nếu để tách rời: ghi được bảng
+   * thù lao rồi gắn buổi thất bại thì còn lại một bảng tiền KHÔNG BIẾT gồm
+   * những buổi nào — đúng lỗi A4 mà migration 0003 vừa sửa xong, quay lại bằng
+   * cửa sau. Và số tiền đó là tiền sắp trả ra khỏi trung tâm.
+   */
+  return db.transaction(async (tx) => {
+    const [ban] = await tx
+      .insert(thuLao)
+      .values({
+        giaoVienId,
+        ky,
+        tongTruocThue: xem.ketQua.tongTruocThue,
+        khauTruTncn: xem.ketQua.khauTruTncn,
+        thucNhan: xem.ketQua.thucNhan,
+        nguongApDung: xem.ketQua.nguongApDung,
+        coCamKet08: xem.coCamKet08,
+      })
+      .returning();
+    await tx.update(buoiDay).set({ thuLaoId: ban.id }).where(inArray(buoiDay.id, xem.buoiIds));
+    await ghiNhatKy("thu_lao", ban.id, "them", nguoiDungId, undefined, { ...ban, buoiIds: xem.buoiIds }, tx);
+    return ban;
+  });
 }
 
 export async function huyThuLao(id: string, nguoiDungId: string | null = null) {
   const [cu] = await db.select().from(thuLao).where(eq(thuLao.id, id)).limit(1);
-  await db.update(buoiDay).set({ thuLaoId: null }).where(eq(buoiDay.thuLaoId, id));
-  await db.delete(thuLao).where(eq(thuLao.id, id));
-  if (cu) await ghiNhatKy("thu_lao", id, "xoa", nguoiDungId, cu, undefined);
+  // Nhả buổi và xoá bảng cùng nhau: hỏng giữa chừng thì buổi mồ côi trỏ vào một
+  // bảng thù lao không còn tồn tại.
+  await db.transaction(async (tx) => {
+    await tx.update(buoiDay).set({ thuLaoId: null }).where(eq(buoiDay.thuLaoId, id));
+    await tx.delete(thuLao).where(eq(thuLao.id, id));
+    if (cu) await ghiNhatKy("thu_lao", id, "xoa", nguoiDungId, cu, undefined, tx);
+  });
 }
 
 export async function danhSachThuLao(ky?: string) {

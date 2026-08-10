@@ -14,10 +14,12 @@ import {
   DeleteObjectCommand,
   GetObjectCommand,
   HeadObjectCommand,
+  ListObjectsV2Command,
   PutObjectCommand,
   S3Client,
 } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
+import type { DongKho } from "@/server/tinhToan/doiChieuKho";
 
 const BIEN_CAN = ["S3_ENDPOINT", "S3_BUCKET", "S3_ACCESS_KEY_ID", "S3_SECRET_ACCESS_KEY"] as const;
 
@@ -137,4 +139,33 @@ export async function duongTaiVe(duongDan: string, tenHienThi?: string): Promise
 
 export async function xoaKhoiKho(duongDan: string): Promise<void> {
   await layKhach().send(new DeleteObjectCommand({ Bucket: BUCKET(), Key: duongDan }));
+}
+
+/**
+ * Liệt kê TOÀN BỘ object trong bucket.
+ *
+ * Phải lặp theo con trỏ: S3 trả tối đa 1000 khoá mỗi lượt, và nếu chỉ đọc lượt
+ * đầu thì mọi thứ từ khoá 1001 trở đi sẽ bị coi như không tồn tại. Với việc đối
+ * chiếu thì "không tồn tại" nghĩa là bỏ sót file mồ côi — còn nếu ai đó lỡ đảo
+ * chiều phép so sánh thì nó nghĩa là XOÁ NHẦM file đang dùng. Nên vòng lặp này
+ * không phải chuyện tối ưu, nó là chuyện đúng/sai.
+ */
+export async function lietKeKho(): Promise<DongKho[]> {
+  const ra: DongKho[] = [];
+  let contoTiep: string | undefined;
+  do {
+    const r = await layKhach().send(
+      new ListObjectsV2Command({ Bucket: BUCKET(), ContinuationToken: contoTiep }),
+    );
+    for (const o of r.Contents ?? []) {
+      if (!o.Key) continue;
+      ra.push({
+        duongDan: o.Key,
+        kichThuoc: Number(o.Size ?? 0),
+        sua: o.LastModified ?? new Date(0),
+      });
+    }
+    contoTiep = r.IsTruncated ? r.NextContinuationToken : undefined;
+  } while (contoTiep);
+  return ra;
 }
