@@ -23,6 +23,7 @@ type DongThamSo = {
   giaTri: string;
   donVi: "vnd" | "phan_tram" | "lan";
   hieuLucTu: string;
+  hieuLucDen?: string;
   nguonVanBan: string;
   ghiChu?: string;
 };
@@ -85,16 +86,55 @@ const THAM_SO: DongThamSo[] = [
     nguonVanBan: "Tỷ lệ đóng BHXH · BHYT · BHTN 2026",
     ghiChu: "Gộp cả BHXH, BHYT, BHTN và bảo hiểm tai nạn lao động. Tổng hai phía 32,5%.",
   },
+  {
+    ma: "luong_co_so",
+    giaTri: "2340000",
+    donVi: "vnd",
+    hieuLucTu: "2024-07-01",
+    hieuLucDen: "2026-07-01",
+    nguonVanBan: "Nghị định 73/2024/NĐ-CP",
+    ghiChu: "Dùng để tính trần đóng BHXH và BHYT (20 lần). Hết hiệu lực 30/06/2026.",
+  },
+  {
+    ma: "luong_co_so",
+    giaTri: "2530000",
+    donVi: "vnd",
+    hieuLucTu: "2026-07-01",
+    nguonVanBan: "Mức lương cơ sở / mức tham chiếu áp dụng từ 01/07/2026",
+    ghiChu:
+      "Trần đóng BHXH, BHYT = 20 lần = 50.600.000đ/tháng. Đây là ví dụ sống cho việc " +
+      "vì sao tham số phải có ngày hiệu lực: cùng năm 2026 có HAI mức, bảng lương " +
+      "tháng 6 và tháng 7 phải dùng hai con số khác nhau.",
+  },
+  {
+    ma: "he_so_tran_dong_bhxh",
+    giaTri: "20",
+    donVi: "lan",
+    hieuLucTu: "2026-01-01",
+    nguonVanBan: "Trần đóng BHXH, BHYT = 20 lần mức lương cơ sở / mức tham chiếu",
+  },
+  {
+    ma: "he_so_tran_dong_bhtn",
+    giaTri: "20",
+    donVi: "lan",
+    hieuLucTu: "2026-01-01",
+    nguonVanBan: "Trần đóng BHTN = 20 lần mức lương tối thiểu vùng nơi doanh nghiệp hoạt động",
+    ghiChu: "Khác BHXH/BHYT: nhân với lương TỐI THIỂU VÙNG, không phải lương cơ sở.",
+  },
 ];
 
 /**
- * Biểu thuế luỹ tiến 2026 — 5 bậc, giảm từ 7.
+ * Biểu thuế luỹ tiến 2026 — 5 bậc, giảm từ 7, áp dụng từ kỳ tính thuế 2026.
  *
- * ⚠️ MỚI TRA ĐƯỢC HAI BẬC ĐẦU VÀ CUỐI. Ba bậc giữa chưa có nguồn xác nhận, nên
- * KHÔNG điền. Điền bừa ở đây là sai số thuế của từng giáo viên từng tháng, và
- * đó đúng loại lỗi không ai phát hiện tới lúc quyết toán.
+ * Tra nguồn 10/08/2026. Số học tự kiểm chứng được, và đó là lý do tin được:
+ * thuế tối đa cộng dồn của từng bậc ra đúng 0,5 → 2,5 → 8,5 → 20,5 triệu như
+ * các bản hướng dẫn nêu.
+ *   bậc 1: 10tr × 5%              = 0,5tr
+ *   bậc 2: 0,5 + 20tr × 10%       = 2,5tr
+ *   bậc 3: 2,5 + 30tr × 20%       = 8,5tr
+ *   bậc 4: 8,5 + 40tr × 30%       = 20,5tr
  *
- * `kiemTraBacThue()` sẽ báo bảng chưa đủ, và tool tính lương phải từ chối chạy.
+ * `daDuyet` để false: máy tra về, chưa có kế toán thật nhìn.
  */
 const BAC_THUE: Array<{
   bac: number;
@@ -103,6 +143,9 @@ const BAC_THUE: Array<{
   thueSuat: string;
 }> = [
   { bac: 1, tuThuNhap: 0, denThuNhap: 10_000_000, thueSuat: "5" },
+  { bac: 2, tuThuNhap: 10_000_000, denThuNhap: 30_000_000, thueSuat: "10" },
+  { bac: 3, tuThuNhap: 30_000_000, denThuNhap: 60_000_000, thueSuat: "20" },
+  { bac: 4, tuThuNhap: 60_000_000, denThuNhap: 100_000_000, thueSuat: "30" },
   { bac: 5, tuThuNhap: 100_000_000, denThuNhap: null, thueSuat: "35" },
 ];
 
@@ -137,6 +180,19 @@ export async function kiemTraBacThue(ngay = new Date()): Promise<KetQuaKiemTra> 
     .orderBy(bacThueTncn.tuThuNhap);
 
   return kiemTraDaiBac(bac);
+}
+
+/**
+ * Bao nhiêu con số pháp lý chưa có người rà.
+ *
+ * Bảng tính nào đọc tham số chưa duyệt thì phải đóng dấu "chưa kế toán rà" —
+ * một bảng lương sai vì tra nhầm số trông giống hệt một bảng lương đúng, và
+ * đó chính là rủi ro §6 xếp mức Cao.
+ */
+export async function demChuaDuyet(): Promise<{ thamSo: number; bacThue: number }> {
+  const a = await db.select().from(thamSoPhapLy).where(eq(thamSoPhapLy.daDuyet, false));
+  const b = await db.select().from(bacThueTncn).where(eq(bacThueTncn.daDuyet, false));
+  return { thamSo: a.length, bacThue: b.length };
 }
 
 /** Giá trị của một tham số tại một thời điểm. `undefined` = chưa có, KHÔNG phải 0. */

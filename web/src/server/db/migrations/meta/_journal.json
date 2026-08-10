@@ -15,6 +15,13 @@
       "when": 1786331467339,
       "tag": "0001_sticky_james_howlett",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1786335400107,
+      "tag": "0002_cultured_spencer_smythe",
+      "breakpoints": true
     }
   ]
 }

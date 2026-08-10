@@ -2,7 +2,7 @@ import { desc } from "drizzle-orm";
 import { db } from "@/server/db/client";
 import { bacThueTncn, thamSoPhapLy } from "@/server/db/schema";
 import { layNguoiDungTuPhien } from "@/server/session";
-import { kiemTraBacThue } from "@/server/store/thamSo";
+import { demChuaDuyet, kiemTraBacThue } from "@/server/store/thamSo";
 import { NHAN_VAI_TRO, type VaiTro } from "@/server/store/users";
 
 export const dynamic = "force-dynamic";
@@ -21,6 +21,7 @@ export default async function TrangChu() {
   const thamSo = await db.select().from(thamSoPhapLy).orderBy(desc(thamSoPhapLy.hieuLucTu));
   const bac = await db.select().from(bacThueTncn).orderBy(bacThueTncn.bac);
   const kiemTra = await kiemTraBacThue();
+  const chuaDuyet = await demChuaDuyet();
 
   return (
     <div className="space-y-6">
@@ -29,8 +30,8 @@ export default async function TrangChu() {
           Chào {nguoiDung ? `${nguoiDung.ho} ${nguoiDung.ten}` : "bạn"}
         </h1>
         <p className="mt-1 text-sm text-white/50">
-          {nguoiDung ? NHAN_VAI_TRO[nguoiDung.vaiTro as VaiTro] : "Chưa đăng nhập"} · giai đoạn 0 — khung
-          hệ thống
+          {nguoiDung ? NHAN_VAI_TRO[nguoiDung.vaiTro as VaiTro] : "Chưa đăng nhập"} · giai đoạn 1 — kho chứng từ
+
         </p>
       </header>
 
@@ -52,6 +53,21 @@ export default async function TrangChu() {
         </section>
       )}
 
+      {chuaDuyet.thamSo + chuaDuyet.bacThue > 0 && (
+        <section className="rounded-xl border border-sky-400/30 bg-sky-400/5 p-4">
+          <h2 className="font-semibold text-sky-200">Chưa có kế toán rà lại</h2>
+          <p className="mt-2 text-sm text-sky-100/70">
+            {chuaDuyet.thamSo} tham số và {chuaDuyet.bacThue} bậc thuế do máy tra về, <strong>có ghi
+            nguồn văn bản nhưng chưa ai xác nhận</strong>. Số vẫn dùng được để chạy thử, nhưng mọi bảng
+            tính từ chúng phải hiểu là bản nháp.
+          </p>
+          <p className="mt-2 text-sm text-sky-100/50">
+            Một bảng lương sai vì tra nhầm số trông giống hệt một bảng lương đúng — đó là lý do trạng
+            thái này nằm ngay đây thay vì trong nhật ký.
+          </p>
+        </section>
+      )}
+
       <section className="rounded-xl border border-white/10 bg-white/[0.02] p-5">
         <div className="mb-4 flex items-baseline justify-between">
           <h2 className="font-semibold">Tham số pháp lý đang áp dụng</h2>
@@ -66,6 +82,7 @@ export default async function TrangChu() {
                 <th className="pb-2 font-medium">Giá trị</th>
                 <th className="pb-2 font-medium">Hiệu lực từ</th>
                 <th className="pb-2 font-medium">Căn cứ</th>
+                <th className="pb-2 font-medium">Rà soát</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-white/5">
@@ -75,6 +92,13 @@ export default async function TrangChu() {
                   <td className="py-2 font-medium tabular-nums">{hienGiaTri(t.giaTri, t.donVi)}</td>
                   <td className="py-2 text-white/50">{t.hieuLucTu}</td>
                   <td className="py-2 text-xs text-white/40">{t.nguonVanBan}</td>
+                  <td className="py-2 text-xs">
+                    {t.daDuyet ? (
+                      <span className="text-emerald-300/70">đã rà</span>
+                    ) : (
+                      <span className="text-sky-300/60">chưa rà</span>
+                    )}
+                  </td>
                 </tr>
               ))}
             </tbody>

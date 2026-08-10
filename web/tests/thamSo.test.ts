@@ -65,12 +65,56 @@ describe("kiemTraDaiBac", () => {
     expect(kq.du).toBe(true);
   });
 
-  it("BIỂU ĐANG NẠP THẬT CHƯA ĐỦ — xoá test này khi tra xong 3 bậc giữa", () => {
-    // Mới tra được bậc 1 (0–10tr, 5%) và bậc 5 (trên 100tr, 35%).
-    const dangCo = kiemTraDaiBac([
+  it("biểu 5 bậc đang nạp thật phủ liền mạch", () => {
+    // Phải khớp BAC_THUE trong src/server/store/thamSo.ts. Sửa một nơi mà quên
+    // nơi kia thì test này đỏ — đó là mục đích của nó.
+    const dangNap = kiemTraDaiBac([
       { bac: 1, tuThuNhap: 0, denThuNhap: 10_000_000 },
+      { bac: 2, tuThuNhap: 10_000_000, denThuNhap: 30_000_000 },
+      { bac: 3, tuThuNhap: 30_000_000, denThuNhap: 60_000_000 },
+      { bac: 4, tuThuNhap: 60_000_000, denThuNhap: 100_000_000 },
       { bac: 5, tuThuNhap: 100_000_000, denThuNhap: null },
     ]);
-    expect(dangCo.du).toBe(false);
+    expect(dangNap).toEqual({ du: true, thieu: [] });
+  });
+});
+
+/**
+ * Số học của biểu thuế tự kiểm chứng được, và đó là lý do tin được bản tra về:
+ * thuế tối đa cộng dồn từng bậc phải ra đúng các mốc mà mọi bản hướng dẫn nêu.
+ * Nếu ai đó gõ nhầm một thuế suất hay một mốc, dãy này lệch ngay.
+ */
+describe("thuế luỹ tiến cộng dồn", () => {
+  const BAC = [
+    { tu: 0, den: 10_000_000, suat: 0.05 },
+    { tu: 10_000_000, den: 30_000_000, suat: 0.1 },
+    { tu: 30_000_000, den: 60_000_000, suat: 0.2 },
+    { tu: 60_000_000, den: 100_000_000, suat: 0.3 },
+    { tu: 100_000_000, den: null as number | null, suat: 0.35 },
+  ];
+
+  function thueTaiMoc(mocTran: number): number {
+    let thue = 0;
+    for (const b of BAC) {
+      const tran = b.den === null ? mocTran : Math.min(b.den, mocTran);
+      if (tran <= b.tu) break;
+      thue += (tran - b.tu) * b.suat;
+    }
+    return thue;
+  }
+
+  it("thuế tối đa của từng bậc ra đúng 0,5 → 2,5 → 8,5 → 20,5 triệu", () => {
+    expect(thueTaiMoc(10_000_000)).toBe(500_000);
+    expect(thueTaiMoc(30_000_000)).toBe(2_500_000);
+    expect(thueTaiMoc(60_000_000)).toBe(8_500_000);
+    expect(thueTaiMoc(100_000_000)).toBe(20_500_000);
+  });
+
+  it("thu nhập 0 thì thuế 0 — không có bậc nào thu trên số âm", () => {
+    expect(thueTaiMoc(0)).toBe(0);
+  });
+
+  it("vượt bậc cuối thì cộng đúng 35% phần vượt", () => {
+    expect(thueTaiMoc(150_000_000)).toBe(20_500_000 + 50_000_000 * 0.35);
   });
 });

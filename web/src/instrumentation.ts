@@ -12,20 +12,29 @@ export async function register() {
 
   const { gieoTaiKhoanDemo } = await import("@/server/store/users");
   const { baoDamDongCaiDat } = await import("@/server/store/settings");
-  const { gieoThamSoPhapLy, kiemTraBacThue } = await import("@/server/store/thamSo");
+  const { demChuaDuyet, gieoThamSoPhapLy, kiemTraBacThue } = await import("@/server/store/thamSo");
 
   await gieoTaiKhoanDemo();
   await baoDamDongCaiDat();
   await gieoThamSoPhapLy();
 
-  // Cảnh báo to, mỗi lần khởi động, cho tới khi tra đủ. Không chặn app chạy —
-  // phần lớn nghiệp vụ không cần biểu thuế — nhưng tool tính lương thì phải dừng.
+  // Không chặn app chạy — phần lớn nghiệp vụ không cần biểu thuế — nhưng tool
+  // tính lương thì phải dừng khi biểu hở.
   const bac = await kiemTraBacThue();
   if (!bac.du) {
     console.warn(
       "[tham số pháp lý] Biểu thuế luỹ tiến CHƯA ĐỦ BẬC: " +
         bac.thieu.join("; ") +
-        "\n  → tinh_luong_bhxh sẽ từ chối chạy. Tra nốt các bậc còn thiếu rồi thêm vào thamSo.ts.",
+        "\n  → tinh_luong_bhxh sẽ từ chối chạy.",
+    );
+  }
+
+  const chua = await demChuaDuyet();
+  if (chua.thamSo + chua.bacThue > 0) {
+    console.warn(
+      `[tham số pháp lý] ${chua.thamSo} tham số và ${chua.bacThue} bậc thuế CHƯA CÓ KẾ TOÁN RÀ. ` +
+        "Số do máy tra về, có ghi nguồn nhưng chưa ai xác nhận — mọi bảng tính từ chúng " +
+        "phải đóng dấu tương ứng.",
     );
   }
 }

@@ -105,12 +105,29 @@ export const thamSoPhapLy = pgTable(
     hieuLucDen: date("hieu_luc_den"), // NULL = còn hiệu lực
     nguonVanBan: text("nguon_van_ban").notNull(),
     ghiChu: text("ghi_chu"),
+    /**
+     * Số này do máy tra về, chưa có kế toán thật nhìn.
+     *
+     * Chiến lược §6 xếp "chưa từng làm kế toán ngành giáo dục" là rủi ro Cao và
+     * nói rõ vòng đầu cần một kế toán rà lại. Cột này biến câu đó thành thứ hệ
+     * thống biết: mọi bảng tính từ tham số chưa duyệt đều phải đóng dấu, thay
+     * vì trông y hệt bảng đã được kiểm.
+     */
+    daDuyet: boolean("da_duyet").notNull().default(false),
+    duyetBoiId: uuid("duyet_boi_id"),
+    duyetLuc: timestamp("duyet_luc", { withTimezone: true }),
     taoLuc: taoLuc(),
   },
   (t) => [
     unique("tham_so_ma_hieu_luc").on(t.ma, t.hieuLucTu),
     check("tham_so_don_vi_hop_le", sql`${t.donVi} in ('vnd','phan_tram','lan')`),
     check("tham_so_khoang_hop_le", sql`${t.hieuLucDen} is null or ${t.hieuLucDen} > ${t.hieuLucTu}`),
+    // Đã duyệt thì phải biết ai duyệt và duyệt lúc nào, không thì "đã duyệt"
+    // chỉ là một ô tích không truy được về ai.
+    check(
+      "tham_so_duyet_du_dau_vet",
+      sql`${t.daDuyet} = false or (${t.duyetLuc} is not null and ${t.duyetBoiId} is not null)`,
+    ),
   ],
 );
 
@@ -126,10 +143,17 @@ export const bacThueTncn = pgTable(
     hieuLucTu: date("hieu_luc_tu").notNull(),
     hieuLucDen: date("hieu_luc_den"),
     nguonVanBan: text("nguon_van_ban").notNull(),
+    daDuyet: boolean("da_duyet").notNull().default(false),
+    duyetBoiId: uuid("duyet_boi_id"),
+    duyetLuc: timestamp("duyet_luc", { withTimezone: true }),
   },
   (t) => [
     unique("bac_thue_bac_hieu_luc").on(t.bac, t.hieuLucTu),
     check("bac_thue_dai_hop_le", sql`${t.denThuNhap} is null or ${t.denThuNhap} > ${t.tuThuNhap}`),
+    check(
+      "bac_thue_duyet_du_dau_vet",
+      sql`${t.daDuyet} = false or (${t.duyetLuc} is not null and ${t.duyetBoiId} is not null)`,
+    ),
   ],
 );
 
