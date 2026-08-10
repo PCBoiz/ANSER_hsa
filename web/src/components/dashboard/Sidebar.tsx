@@ -13,7 +13,7 @@ const MUC = [
   { nhan: "Sổ thu chi", icon: ChartIcon, href: "/dashboard/so-thu-chi" },
   { nhan: "Kho tài liệu", icon: ReceiptIcon, href: "/dashboard/tai-lieu" },
   { nhan: "Cài đặt", icon: SettingsIcon, href: "/dashboard/settings" },
-  { nhan: "Giáo viên · thù lao", icon: StaffIcon, sapCo: "GĐ3" },
+  { nhan: "Giáo viên · thù lao", icon: StaffIcon, href: "/dashboard/thu-lao" },
   { nhan: "Học viên · học phí", icon: UsersIcon, sapCo: "GĐ5" },
   { nhan: "Tự động hoá", icon: BoltIcon, sapCo: "GĐ7" },
 ];
