@@ -52,6 +52,12 @@ venv/
 .ruff_cache/
 *.egg-info/
 
+# --------------------------------------------------- script thử một lần
+# Tiền tố _ cho mọi script chạy tay lúc kiểm thử. Chúng nói về trạng thái
+# một lúc nào đó, không phải về sản phẩm — để lại là rác cho người sau.
+_*.mjs
+_*.py
+
 # ------------------------------------------------------------- OS / IDE
 .DS_Store
 Thumbs.db
