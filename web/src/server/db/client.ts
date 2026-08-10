@@ -9,3 +9,6 @@ if (!process.env.DATABASE_URL) {
 // Pool-based (WebSocket) driver — needed for real db.transaction() support,
 // unlike the lighter neon-http driver which can only run single statements.
 export const db = drizzle(new Pool({ connectionString: process.env.DATABASE_URL }), { schema });
+
+/** Kiểu dùng chung cho `db` và một transaction — để hàm nhận cả hai. */
+export type Db = typeof db | Parameters<Parameters<(typeof db)["transaction"]>[0]>[0];

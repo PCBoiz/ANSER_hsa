@@ -231,3 +231,93 @@ export async function cacKyCoDuLieu(): Promise<string[]> {
   const b = await db.selectDistinct({ ky: khoanChi.ky }).from(khoanChi);
   return [...new Set([...a, ...b].map((r) => r.ky))].sort().reverse();
 }
+
+/* ═══════════════════════════════ kỳ kế toán ══════════════════════════════ */
+
+export type DongKy = {
+  ky: string;
+  trangThai: "mo" | "dang_chot" | "da_khoa";
+  khoaLuc: Date | null;
+  khoaBoiId: string | null;
+  ghiChu: string | null;
+  tongHop: TongHop;
+};
+
+/** Các kỳ có dữ liệu HOẶC đã có dòng trạng thái, kèm tổng hợp từng kỳ. */
+export async function danhSachKy(): Promise<DongKy[]> {
+  const coDuLieu = await cacKyCoDuLieu();
+  const daGhi = await db.select().from(kyKeToan);
+  const tatCa = [...new Set([...coDuLieu, ...daGhi.map((k) => k.ky)])].sort().reverse();
+  const theoKy = new Map(daGhi.map((k) => [k.ky, k]));
+
+  return Promise.all(
+    tatCa.map(async (ky) => {
+      const d = theoKy.get(ky);
+      return {
+        ky,
+        trangThai: (d?.trangThai ?? "mo") as DongKy["trangThai"],
+        khoaLuc: d?.khoaLuc ?? null,
+        khoaBoiId: d?.khoaBoiId ?? null,
+        ghiChu: d?.ghiChu ?? null,
+        tongHop: await tongHopKy(ky),
+      };
+    }),
+  );
+}
+
+export class ConDongChuaQuyetError extends Error {
+  constructor(public soDong: number) {
+    super(
+      `Còn ${soDong} dòng doanh thu chưa quyết kê khai. Khoá sổ bây giờ là chốt một kỳ ` +
+        `mà chính mình chưa biết phần nào sẽ vào tờ khai.`,
+    );
+    this.name = "ConDongChuaQuyetError";
+  }
+}
+
+/**
+ * Khoá hoặc mở khoá một kỳ.
+ *
+ * Mở khoá NẶNG HƠN khoá: nó mở lại một kỳ đã chốt và có thể đã nộp tờ khai, nên
+ * bắt buộc ghi lý do. Khoá thì chỉ cần một điều kiện — không còn dòng nào
+ * `chua_quyet`, vì chốt một kỳ mà chưa biết phần nào sẽ vào tờ khai thì con dấu
+ * đó không có nghĩa gì.
+ */
+export async function datTrangThaiKy(
+  ky: string,
+  trangThai: DongKy["trangThai"],
+  nguoiDungId: string,
+  ghiChu?: string | null,
+): Promise<DongKy["trangThai"]> {
+  if (!laKyHopLe(ky)) throw new Error("Kỳ phải là YYYY-MM.");
+
+  if (trangThai === "da_khoa") {
+    const th = await tongHopKy(ky);
+    if (th.soDongChuaQuyet > 0) throw new ConDongChuaQuyetError(th.soDongChuaQuyet);
+  }
+  if (trangThai === "mo" && !ghiChu?.trim()) {
+    throw new Error("Mở khoá một kỳ đã chốt thì phải ghi lý do — đây là thứ sẽ bị hỏi lại.");
+  }
+
+  const gia = {
+    trangThai,
+    khoaLuc: trangThai === "da_khoa" ? new Date() : null,
+    khoaBoiId: trangThai === "da_khoa" ? nguoiDungId : null,
+    ghiChu: ghiChu ?? null,
+  };
+
+  // Đổi trạng thái và ghi nhật ký PHẢI cùng sống hoặc cùng chết. Audit bắt được
+  // đúng ca ngược lại: trạng thái đã đổi, nhật ký ném lỗi, API báo hỏng — người
+  // dùng tưởng chưa khoá trong khi sổ đã khoá rồi.
+  await db.transaction(async (tx) => {
+    const [cu] = await tx.select().from(kyKeToan).where(eq(kyKeToan.ky, ky)).limit(1);
+    if (cu) {
+      const [moi] = await tx.update(kyKeToan).set(gia).where(eq(kyKeToan.ky, ky)).returning();
+      await ghiNhatKy("ky_ke_toan", moi.ky, "sua", nguoiDungId, cu, moi, tx);
+    } else {
+      const [moi] = await tx.insert(kyKeToan).values({ ky, ...gia }).returning();
+      await ghiNhatKy("ky_ke_toan", moi.ky, "them", nguoiDungId, undefined, moi, tx);
+    }
+  });
+  return trangThai;
+}

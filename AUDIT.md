@@ -8,7 +8,7 @@
 ```
 36 bảng · 79 ràng buộc CHECK · 31 khoá ngoại
 28 file route API · 34 đường (method × path)
-231 test: 127 hàm thuần + 104 ma trận phân quyền chạy trên server sống
+241 test: 127 hàm thuần + 114 ma trận phân quyền chạy trên server sống
 ```
 
 Trước audit, **toàn bộ 104 test phân quyền không tồn tại** — mọi kiểm tra API đều là
@@ -69,7 +69,29 @@ mỗi lần kiểm chặn lại quét qua nhiều hơn.
 Nay cả hai dọn kèm lúc đăng nhập: rác quá cửa sổ 15 phút, và phiên hết hạn quá 30
 ngày. Không cần dựng cron cho hai bảng nhỏ.
 
-### 1.5. Ba file chết từ khung Body
+### 1.5. `nhat_ky_thay_doi.ban_ghi_id` là `uuid` — khoá sổ ghi được một nửa
+
+Lộ ra khi dựng màn hình Kỳ kế toán, và là lỗi nặng nhất tìm được trong cả audit.
+
+`ky_ke_toan` có khoá chính là `ky` dạng `'2026-08'`, không phải uuid. Nhật ký ép
+kiểu `uuid` nên **ném lỗi SAU KHI trạng thái đã đổi**: DB đã khoá sổ, API trả 400,
+người dùng tưởng chưa khoá. Ghi một nửa — tệ hơn cả hai kết cục sạch.
+
+Hai chỗ sửa, và chỗ thứ hai mới là chỗ đáng:
+
+1. `ban_ghi_id` thành `text` — nhật ký phải trỏ được tới khoá chính của **mọi**
+   bảng, không chỉ bảng dùng uuid *(migration `0007`)*.
+2. **Đổi dữ liệu và ghi nhật ký nay nằm trong cùng một giao dịch.** Driver đang
+   dùng là Pool/WebSocket của Neon nên `db.transaction()` chạy được thật.
+   `ghiNhatKy` nhận thêm tham số `tx`. Một nhật ký kiểm toán mà có thể vắng mặt
+   đúng lúc thay đổi xảy ra thì nó không phải nhật ký kiểm toán.
+
+*Còn nợ:* mới bọc giao dịch cho `datTrangThaiKy` — chỗ lỗi lộ ra. Các đường ghi
+khác (`ghiKhoanThu`, `chotThuLao`, `datTrangThai` của TT29…) vẫn tách rời hai
+bước. Chúng không gặp lỗi kiểu dữ liệu nữa nên không còn vỡ, nhưng nếu nhật ký
+hỏng vì lý do khác thì vẫn ghi một nửa. Mẫu sửa đã có sẵn, chỉ là chưa áp hết.
+
+### 1.6. Ba file chết từ khung Body
 
 `BarChartCard.tsx`, `StatCard.tsx`, `server/n8n.ts` — không nơi nào import. Đã xoá.
 
@@ -147,5 +169,6 @@ Next.js cần nó.
 ## 4. Việc kế tiếp theo thứ tự
 
 1. Chốt cách xử lý trần 4,5MB (mục 2.1) trước khi đẩy lên Vercel
-2. Màn hình Kỳ kế toán — khoá và mở khoá hiện vẫn phải chạy SQL tay
-3. Nhánh Neon riêng cho test, trước khi có dữ liệu thật đầu tiên
+2. ~~Màn hình Kỳ kế toán~~ — **xong**, và chính nó làm lộ lỗi 1.5
+3. Bọc giao dịch cho các đường ghi còn lại (xem cuối mục 1.5)
+4. Nhánh Neon riêng cho test, trước khi có dữ liệu thật đầu tiên

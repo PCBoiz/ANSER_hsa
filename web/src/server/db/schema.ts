@@ -854,7 +854,16 @@ export const nhatKyThayDoi = pgTable(
   {
     id: uuid("id").primaryKey().defaultRandom(),
     bang: text("bang").notNull(),
-    banGhiId: uuid("ban_ghi_id").notNull(),
+    /**
+     * TEXT chứ không phải UUID.
+     *
+     * Audit 10/08/2026 bắt được: `ky_ke_toan` có khoá chính là `ky` dạng
+     * '2026-08', không phải uuid. Ép uuid ở đây làm mọi lần khoá sổ ném lỗi
+     * SAU KHI trạng thái đã đổi — ghi một nửa, và API báo hỏng trong khi DB đã
+     * đổi. Nhật ký phải trỏ được tới khoá chính của MỌI bảng, không chỉ bảng
+     * dùng uuid.
+     */
+    banGhiId: text("ban_ghi_id").notNull(),
     hanhDong: text("hanh_dong").notNull(),
     truoc: jsonb("truoc"),
     sau: jsonb("sau"),

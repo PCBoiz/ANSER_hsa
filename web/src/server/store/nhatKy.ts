@@ -1,4 +1,4 @@
-import { db } from "@/server/db/client";
+import { db, type Db } from "@/server/db/client";
 import { nhatKyThayDoi } from "@/server/db/schema";
 
 /**
@@ -20,8 +20,16 @@ export async function ghiNhatKy(
   nguoiDungId: string | null,
   truoc?: unknown,
   sau?: unknown,
+  /**
+   * Truyền `tx` để ghi nhật ký NẰM TRONG cùng giao dịch với thay đổi.
+   *
+   * Không truyền thì hai việc tách rời: nếu nhật ký hỏng sau khi đã sửa dữ liệu
+   * thì còn lại một thay đổi không ai biết đã xảy ra. Với một nhật ký kiểm toán
+   * thì đó đúng là tình huống nó sinh ra để chặn.
+   */
+  tx: Db = db,
 ): Promise<void> {
-  await db.insert(nhatKyThayDoi).values({
+  await tx.insert(nhatKyThayDoi).values({
     bang,
     banGhiId,
     hanhDong,

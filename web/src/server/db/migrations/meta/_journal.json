@@ -50,6 +50,13 @@
       "when": 1786341710144,
       "tag": "0006_lop_hoc_chua_duoc_lop_thieu_thong_tin",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1786343391614,
+      "tag": "0007_nhat_ky_ban_ghi_id_text",
+      "breakpoints": true
     }
   ]
 }

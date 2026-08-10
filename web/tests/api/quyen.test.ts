@@ -96,6 +96,8 @@ const MA_TRAN: [string, string, VaiTro, unknown?][] = [
   ["GET", "/api/tt29", "ke_toan"],
   ["PATCH", "/api/tt29", "quan_ly", { muc: "khong_ton_tai" }],
   ["GET", "/api/du-lieu-mau", "ke_toan"],
+  ["GET", "/api/ky-ke-toan", "ke_toan"],
+  ["PATCH", "/api/ky-ke-toan", "quan_ly", { ky: "sai" }],
   ["GET", "/api/automation/rules", "ke_toan"],
   ["POST", "/api/automation/rules", "quan_ly", {}],
 ];

@@ -1,0 +1,1 @@
+ALTER TABLE "nhat_ky_thay_doi" ALTER COLUMN "ban_ghi_id" SET DATA TYPE text;
