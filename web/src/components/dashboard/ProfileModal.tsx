@@ -3,20 +3,20 @@
 import { useState } from "react";
 import { XIcon } from "@/components/dashboard/icons";
 
-type PublicUser = { firstName: string; lastName: string; email: string; phone: string | null };
+import type { NguoiDungCongKhai } from "@/components/dashboard/Topbar";
 
 export default function ProfileModal({
   user,
   onClose,
   onUpdated,
 }: {
-  user: PublicUser;
+  user: NguoiDungCongKhai;
   onClose: () => void;
-  onUpdated: (user: PublicUser) => void;
+  onUpdated: (user: NguoiDungCongKhai) => void;
 }) {
-  const [firstName, setFirstName] = useState(user.firstName);
-  const [lastName, setLastName] = useState(user.lastName);
-  const [phone, setPhone] = useState(user.phone ?? "");
+  const [ten, setTen] = useState(user.ten);
+  const [ho, setHo] = useState(user.ho);
+  const [dienThoai, setDienThoai] = useState(user.dienThoai ?? "");
   const [savingProfile, setSavingProfile] = useState(false);
   const [profileError, setProfileError] = useState<string | null>(null);
   const [profileSaved, setProfileSaved] = useState(false);
@@ -36,7 +36,7 @@ export default function ProfileModal({
     const res = await fetch("/api/auth/me", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ firstName, lastName, phone: phone || null }),
+      body: JSON.stringify({ ho, ten, dienThoai: dienThoai || null }),
     });
     const data = await res.json().catch(() => ({}));
     setSavingProfile(false);
@@ -46,7 +46,7 @@ export default function ProfileModal({
       return;
     }
     setProfileSaved(true);
-    onUpdated(data.user);
+    onUpdated(data.nguoiDung);
   }
 
   async function savePassword() {
@@ -62,7 +62,7 @@ export default function ProfileModal({
     const res = await fetch("/api/auth/me", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ currentPassword, newPassword }),
+      body: JSON.stringify({ matKhauHienTai: currentPassword, matKhauMoi: newPassword }),
     });
     const data = await res.json().catch(() => ({}));
     setSavingPassword(false);
@@ -75,6 +75,16 @@ export default function ProfileModal({
     setCurrentPassword("");
     setNewPassword("");
     setConfirmPassword("");
+
+    // Đổi mật khẩu là thu hồi MỌI phiên, kể cả phiên đang mở — nếu ai đó đang
+    // dùng trộm tài khoản này thì đổi mật khẩu phải cắt được họ. Nghĩa là chính
+    // mình cũng bị đá ra, nên phải nói trước rồi chuyển trang, thay vì để người
+    // dùng bấm tiếp một nút nào đó và nhận 401 không hiểu vì sao.
+    if (data.phaiDangNhapLai) {
+      setTimeout(() => {
+        window.location.href = "/login";
+      }, 1500);
+    }
   }
 
   return (
@@ -98,16 +108,16 @@ export default function ProfileModal({
             <div>
               <label className="mb-1.5 block text-xs font-semibold text-zinc-400">Họ</label>
               <input
-                value={lastName}
-                onChange={(e) => setLastName(e.target.value)}
+                value={ho}
+                onChange={(e) => setHo(e.target.value)}
                 className="w-full rounded-xl border border-white/[0.08] bg-black/30 px-3 py-2.5 text-sm outline-none focus:border-sky-500"
               />
             </div>
             <div>
               <label className="mb-1.5 block text-xs font-semibold text-zinc-400">Tên</label>
               <input
-                value={firstName}
-                onChange={(e) => setFirstName(e.target.value)}
+                value={ten}
+                onChange={(e) => setTen(e.target.value)}
                 className="w-full rounded-xl border border-white/[0.08] bg-black/30 px-3 py-2.5 text-sm outline-none focus:border-sky-500"
               />
             </div>
@@ -125,8 +135,8 @@ export default function ProfileModal({
           <div>
             <label className="mb-1.5 block text-xs font-semibold text-zinc-400">Số điện thoại</label>
             <input
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
+              value={dienThoai}
+              onChange={(e) => setDienThoai(e.target.value)}
               className="w-full rounded-xl border border-white/[0.08] bg-black/30 px-3 py-2.5 text-sm outline-none focus:border-sky-500"
             />
           </div>
@@ -146,7 +156,9 @@ export default function ProfileModal({
             <p className="rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-400">{passwordError}</p>
           )}
           {passwordSaved && (
-            <p className="rounded-lg bg-emerald-500/10 px-3 py-2 text-sm text-emerald-400">Đã đổi mật khẩu.</p>
+            <p className="rounded-lg bg-emerald-500/10 px-3 py-2 text-sm text-emerald-400">
+              Đã đổi mật khẩu. Mọi thiết bị khác đã bị đăng xuất — đang đưa bạn về trang đăng nhập…
+            </p>
           )}
 
           <div>

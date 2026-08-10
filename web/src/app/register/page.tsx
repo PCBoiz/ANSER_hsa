@@ -7,11 +7,11 @@ import FloatingInput from "@/components/FloatingInput";
 
 export default function RegisterPage() {
   const router = useRouter();
-  const [firstName, setFirstName] = useState("");
-  const [lastName, setLastName] = useState("");
+  const [ten, setTen] = useState("");
+  const [ho, setHo] = useState("");
   const [email, setEmail] = useState("");
-  const [phone, setPhone] = useState("");
-  const [password, setPassword] = useState("");
+  const [dienThoai, setDienThoai] = useState("");
+  const [matKhau, setMatKhau] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -24,7 +24,7 @@ export default function RegisterPage() {
       const res = await fetch("/api/auth/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ firstName, lastName, email, phone, password }),
+        body: JSON.stringify({ ho, ten, email, dienThoai, matKhau }),
       });
 
       const data = await res.json().catch(() => null);
@@ -42,7 +42,7 @@ export default function RegisterPage() {
   return (
     <AuthShell
       brandTitle="Tạo tài khoản"
-      brandSubtitle="Thiết lập không gian làm việc hiệu quả của bạn chỉ tại một nơi duy nhất."
+      brandSubtitle="Tài khoản đầu tiên là chủ trung tâm. Từ người thứ hai trở đi, quản lý cấp quyền trong mục Nhân sự."
       formTitle="Bắt đầu ngay"
       formSubtitle="Bước vào hành trình quản lý thông minh cùng ANSER"
       switchText="Đã có tài khoản?"
@@ -61,16 +61,16 @@ export default function RegisterPage() {
             id="first_name"
             type="text"
             label="Họ"
-            value={firstName}
-            onChange={(e) => setFirstName(e.target.value)}
+            value={ten}
+            onChange={(e) => setTen(e.target.value)}
             required
           />
           <FloatingInput
             id="last_name"
             type="text"
             label="Tên"
-            value={lastName}
-            onChange={(e) => setLastName(e.target.value)}
+            value={ho}
+            onChange={(e) => setHo(e.target.value)}
             required
           />
         </div>
@@ -84,19 +84,19 @@ export default function RegisterPage() {
           required
         />
         <FloatingInput
-          id="phone"
+          id="dienThoai"
           type="tel"
           label="Số điện thoại (tùy chọn)"
-          value={phone}
-          onChange={(e) => setPhone(e.target.value)}
+          value={dienThoai}
+          onChange={(e) => setDienThoai(e.target.value)}
         />
         <FloatingInput
-          id="password"
+          id="matKhau"
           type="password"
-          label="Mật khẩu (ít nhất 6 ký tự)"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          minLength={6}
+          label="Mật khẩu (ít nhất 8 ký tự)"
+          value={matKhau}
+          onChange={(e) => setMatKhau(e.target.value)}
+          minLength={8}
           required
         />
 

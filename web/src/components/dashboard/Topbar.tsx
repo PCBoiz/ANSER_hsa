@@ -5,11 +5,24 @@ import { useRouter } from "next/navigation";
 import { BellIcon, ChevronDownIcon, SearchIcon } from "@/components/dashboard/icons";
 import ProfileModal from "@/components/dashboard/ProfileModal";
 
-type PublicUser = { firstName: string; lastName: string; email: string; phone: string | null };
+export type NguoiDungCongKhai = {
+  ho: string;
+  ten: string;
+  email: string;
+  dienThoai: string | null;
+  vaiTro: string;
+};
+
+const NHAN_VAI_TRO: Record<string, string> = {
+  tro_giang: "Trợ giảng",
+  ke_toan: "Kế toán",
+  quan_ly: "Quản lý",
+  admin: "Quản trị",
+};
 
 export default function Topbar() {
   const router = useRouter();
-  const [user, setUser] = useState<PublicUser | null>(null);
+  const [user, setUser] = useState<NguoiDungCongKhai | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
 
@@ -17,7 +30,7 @@ export default function Topbar() {
     const res = await fetch("/api/auth/me");
     if (!res.ok) return;
     const data = await res.json();
-    setUser(data.user);
+    setUser(data.nguoiDung);
   }, []);
 
   useEffect(() => {
@@ -30,8 +43,11 @@ export default function Topbar() {
     router.push("/login");
   }
 
-  const initial = user ? user.firstName.charAt(0).toUpperCase() : "?";
-  const fullName = user ? `${user.firstName} ${user.lastName}` : "Đang tải...";
+  const initial = user ? user.ten.charAt(0).toUpperCase() : "?";
+  const fullName = user ? `${user.ho} ${user.ten}` : "Đang tải...";
+  // Trước đây dòng này ghi cứng "Quản trị viên" cho mọi người — sai với ai không
+  // phải admin, và ở đây phân quyền là thật chứ không phải trang trí.
+  const nhanVaiTro = user ? (NHAN_VAI_TRO[user.vaiTro] ?? user.vaiTro) : "";
 
   return (
     <>
@@ -65,7 +81,7 @@ export default function Topbar() {
             </div>
             <div className="hidden text-left sm:block">
               <p className="text-sm font-semibold">{fullName}</p>
-              <p className="text-xs text-zinc-500">Quản trị viên</p>
+              <p className="text-xs text-zinc-500">{nhanVaiTro}</p>
             </div>
             <ChevronDownIcon className="h-4 w-4 text-zinc-500" />
           </button>

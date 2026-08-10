@@ -2,18 +2,20 @@ import Link from "next/link";
 import { ReactNode } from "react";
 import AmbientOrbs from "@/components/AmbientOrbs";
 
+// Ba dòng này là thứ khách đọc đầu tiên. Không hứa thứ chưa làm được, và không
+// nói "AI" — MISA EMIS đã có AI, đem chỗ mình cố tình chưa làm ra so là tự thua.
 const features = [
   {
-    title: "Quản lý khách hàng",
-    desc: "Quản lý khách hàng và giữ liên hệ của bạn luôn ngăn nắp.",
+    title: "Kho chứng từ tập trung",
+    desc: "Hoá đơn, hợp đồng, bản xuất MISA nằm một chỗ, tìm lại được theo kỳ — thay cho máy cá nhân và Drive.",
   },
   {
-    title: "Quản lý sản phẩm & kho hàng",
-    desc: "Theo dõi sản phẩm, tồn kho và biến động tại một nơi duy nhất.",
+    title: "Thù lao và thuế tính sẵn",
+    desc: "Thù lao giáo viên theo buổi, khấu trừ TNCN, ai cần cam kết 08 — tính bằng công thức có kiểm chứng.",
   },
   {
-    title: "Tự động hóa thông minh",
-    desc: "Tự động hóa các tác vụ thường ngày và nhận báo cáo sẵn sàng dùng.",
+    title: "Không bỏ sót hạn nào",
+    desc: "Hạn nộp thuế, BHXH và hồ sơ TT29 còn thiếu, nhắc trước khi tới hạn.",
   },
 ];
 

@@ -5,18 +5,20 @@ import { useRouter } from "next/navigation";
 import AuthShell from "@/components/AuthShell";
 import FloatingInput from "@/components/FloatingInput";
 
-const DEMO_ACCOUNT = { email: "demo@anser.dev", password: "demo1234" };
+// Phải khớp TAI_KHOAN_DEMO trong src/server/store/users.ts — đó là tài khoản
+// bộ gieo thật sự tạo ra lúc khởi động.
+const TAI_KHOAN_DEMO = { email: "demo@anser-hsa.dev", matKhau: "demo1234" };
 
 export default function LoginPage() {
   const router = useRouter();
   const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const [matKhau, setMatKhau] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  function fillDemoAccount() {
-    setEmail(DEMO_ACCOUNT.email);
-    setPassword(DEMO_ACCOUNT.password);
+  function dienTaiKhoanDemo() {
+    setEmail(TAI_KHOAN_DEMO.email);
+    setMatKhau(TAI_KHOAN_DEMO.matKhau);
   }
 
   async function handleSubmit(e: FormEvent) {
@@ -28,7 +30,7 @@ export default function LoginPage() {
       const res = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ email, matKhau }),
       });
 
       const data = await res.json().catch(() => null);
@@ -45,8 +47,8 @@ export default function LoginPage() {
 
   return (
     <AuthShell
-      brandTitle="ANSER"
-      brandSubtitle="Hệ thống quản lý thông minh giúp tổ chức công việc hiệu quả với cấu trúc phân lớp và các kênh kết nối mạnh mẽ."
+      brandTitle="ANSER·HSA"
+      brandSubtitle="Kế toán và hồ sơ cho trung tâm luyện thi — tiền vào, tiền ra và nghĩa vụ pháp lý khớp với nhau ở một chỗ."
       formTitle="Chào mừng trở lại"
       formSubtitle="Đăng nhập để tiếp tục vào không gian làm việc"
       switchText="Chưa có tài khoản?"
@@ -69,11 +71,11 @@ export default function LoginPage() {
           required
         />
         <FloatingInput
-          id="password"
+          id="matKhau"
           type="password"
           label="Mật khẩu"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
+          value={matKhau}
+          onChange={(e) => setMatKhau(e.target.value)}
           required
         />
 
@@ -89,13 +91,13 @@ export default function LoginPage() {
       <div className="mt-10 border-t border-white/[0.08] pt-6">
         <button
           type="button"
-          onClick={fillDemoAccount}
+          onClick={dienTaiKhoanDemo}
           className="flex w-full items-center justify-between rounded-xl border border-white/[0.08] bg-black/30 p-3 text-left transition-colors hover:border-sky-500/40 hover:bg-sky-500/5"
         >
           <span className="text-xs font-semibold text-zinc-400">
             <span className="mr-1">👤</span> Tài khoản demo
           </span>
-          <span className="font-mono text-xs text-zinc-500">{DEMO_ACCOUNT.email}</span>
+          <span className="font-mono text-xs text-zinc-500">{TAI_KHOAN_DEMO.email}</span>
         </button>
       </div>
     </AuthShell>

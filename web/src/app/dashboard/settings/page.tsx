@@ -2,170 +2,182 @@
 
 import { useCallback, useEffect, useState } from "react";
 
-type CompanySettings = {
-  name: string;
-  address: string | null;
-  phone: string | null;
+type CaiDat = {
+  ten: string;
+  diaChi: string | null;
+  dienThoai: string | null;
   email: string | null;
-  taxCode: string | null;
-  currency: string;
+  maSoThue: string | null;
+  vungLuongToiThieu: number;
 };
 
-const emptyForm: CompanySettings = { name: "", address: "", phone: "", email: "", taxCode: "", currency: "VND" };
+const RONG: CaiDat = {
+  ten: "",
+  diaChi: "",
+  dienThoai: "",
+  email: "",
+  maSoThue: "",
+  vungLuongToiThieu: 1,
+};
 
-export default function SettingsPage() {
-  const [form, setForm] = useState<CompanySettings>(emptyForm);
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [toast, setToast] = useState<string | null>(null);
+/** Sàn đóng BHXH theo vùng — con số thật đọc từ bảng tham_so_phap_ly, không ghi ở đây. */
+const VUNG = [
+  { v: 1, nhan: "Vùng I — Hà Nội, TP.HCM và các quận nội thành" },
+  { v: 2, nhan: "Vùng II" },
+  { v: 3, nhan: "Vùng III" },
+  { v: 4, nhan: "Vùng IV" },
+];
 
-  const load = useCallback(async () => {
+export default function TrangCaiDat() {
+  const [form, setForm] = useState<CaiDat>(RONG);
+  const [dangTai, setDangTai] = useState(true);
+  const [dangLuu, setDangLuu] = useState(false);
+  const [loi, setLoi] = useState<string | null>(null);
+  const [bao, setBao] = useState<string | null>(null);
+
+  const nap = useCallback(async () => {
     const res = await fetch("/api/settings/company");
-    const data = await res.json();
-    const s = data.settings;
+    if (!res.ok) {
+      setLoi("Không đọc được cài đặt — có thể tài khoản không đủ quyền.");
+      setDangTai(false);
+      return;
+    }
+    const { caiDat } = await res.json();
     setForm({
-      name: s.name ?? "",
-      address: s.address ?? "",
-      phone: s.phone ?? "",
-      email: s.email ?? "",
-      taxCode: s.taxCode ?? "",
-      currency: s.currency ?? "VND",
+      ten: caiDat.ten ?? "",
+      diaChi: caiDat.diaChi ?? "",
+      dienThoai: caiDat.dienThoai ?? "",
+      email: caiDat.email ?? "",
+      maSoThue: caiDat.maSoThue ?? "",
+      vungLuongToiThieu: caiDat.vungLuongToiThieu ?? 1,
     });
-    setLoading(false);
+    setDangTai(false);
   }, []);
 
   useEffect(() => {
-    const timeout = setTimeout(load, 0);
-    return () => clearTimeout(timeout);
-  }, [load]);
+    const t = setTimeout(nap, 0);
+    return () => clearTimeout(t);
+  }, [nap]);
 
-  function showToast(message: string) {
-    setToast(message);
-    setTimeout(() => setToast(null), 3000);
-  }
-
-  async function handleSave() {
-    setSaving(true);
-    setError(null);
+  async function luu() {
+    setDangLuu(true);
+    setLoi(null);
 
     const res = await fetch("/api/settings/company", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(form),
     });
-
-    setSaving(false);
+    setDangLuu(false);
 
     if (!res.ok) {
-      const data = await res.json().catch(() => ({}));
-      setError(data.message ?? "Có lỗi xảy ra.");
+      setLoi((await res.json().catch(() => ({}))).message ?? "Không lưu được.");
       return;
     }
-
-    showToast("Đã lưu thông tin doanh nghiệp.");
-    await load();
+    setBao("Đã lưu.");
+    setTimeout(() => setBao(null), 3000);
   }
 
+  const oNhap =
+    "w-full rounded-lg border border-white/10 bg-[#0d0d12] px-3 py-2 text-white placeholder:text-white/25";
+
+  if (dangTai) return <p className="text-sm text-white/40">Đang tải…</p>;
+
   return (
-    <div className="flex flex-col gap-6">
-      <div className="text-xs font-semibold tracking-wide text-zinc-500 uppercase">
-        Trang chủ <span className="mx-1.5">›</span> <span className="text-zinc-300">Cài đặt</span>
-      </div>
-
-      <div>
+    <div className="max-w-2xl space-y-6">
+      <header>
         <h1 className="text-2xl font-bold">Cài đặt</h1>
-        <p className="mt-1 text-sm text-zinc-500">Thông tin doanh nghiệp hiển thị trên hoá đơn và báo cáo.</p>
-      </div>
+        <p className="mt-1 text-sm text-white/50">Thông tin trung tâm, dùng cho hồ sơ và tờ khai</p>
+      </header>
 
-      <div className="max-w-xl rounded-2xl border border-white/[0.08] bg-white/[0.02] p-6">
-        <h3 className="mb-4 text-sm font-semibold text-zinc-200">Thông tin doanh nghiệp</h3>
-
-        {loading ? (
-          <p className="text-sm text-zinc-500">Đang tải...</p>
-        ) : (
-          <div className="flex flex-col gap-4">
-            {error && <p className="rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-400">{error}</p>}
-
-            <div>
-              <label className="mb-1.5 block text-xs font-semibold text-zinc-400">Tên doanh nghiệp</label>
-              <input
-                required
-                value={form.name}
-                onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-                placeholder="VD: Công ty TNHH ANSER"
-                className="w-full rounded-xl border border-white/[0.08] bg-black/30 px-3 py-2.5 text-sm outline-none focus:border-sky-500"
-              />
-            </div>
-
-            <div>
-              <label className="mb-1.5 block text-xs font-semibold text-zinc-400">Địa chỉ</label>
-              <input
-                value={form.address ?? ""}
-                onChange={(e) => setForm((f) => ({ ...f, address: e.target.value }))}
-                placeholder="Số nhà, đường, quận/huyện, tỉnh/thành"
-                className="w-full rounded-xl border border-white/[0.08] bg-black/30 px-3 py-2.5 text-sm outline-none focus:border-sky-500"
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="mb-1.5 block text-xs font-semibold text-zinc-400">Số điện thoại</label>
-                <input
-                  value={form.phone ?? ""}
-                  onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))}
-                  className="w-full rounded-xl border border-white/[0.08] bg-black/30 px-3 py-2.5 text-sm outline-none focus:border-sky-500"
-                />
-              </div>
-              <div>
-                <label className="mb-1.5 block text-xs font-semibold text-zinc-400">Email</label>
-                <input
-                  type="email"
-                  value={form.email ?? ""}
-                  onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
-                  className="w-full rounded-xl border border-white/[0.08] bg-black/30 px-3 py-2.5 text-sm outline-none focus:border-sky-500"
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="mb-1.5 block text-xs font-semibold text-zinc-400">Mã số thuế</label>
-                <input
-                  value={form.taxCode ?? ""}
-                  onChange={(e) => setForm((f) => ({ ...f, taxCode: e.target.value }))}
-                  className="w-full rounded-xl border border-white/[0.08] bg-black/30 px-3 py-2.5 text-sm outline-none focus:border-sky-500"
-                />
-              </div>
-              <div>
-                <label className="mb-1.5 block text-xs font-semibold text-zinc-400">Đơn vị tiền tệ</label>
-                <select
-                  value={form.currency}
-                  onChange={(e) => setForm((f) => ({ ...f, currency: e.target.value }))}
-                  className="w-full rounded-xl border border-white/[0.08] bg-black/30 px-3 py-2.5 text-sm outline-none focus:border-sky-500"
-                >
-                  <option value="VND">VND</option>
-                  <option value="USD">USD</option>
-                </select>
-              </div>
-            </div>
-
-            <button
-              onClick={handleSave}
-              disabled={saving}
-              className="mt-2 self-start rounded-xl bg-white px-5 py-2.5 text-sm font-bold text-black transition-transform hover:-translate-y-0.5 disabled:opacity-60"
-            >
-              {saving ? "Đang lưu..." : "Lưu thay đổi"}
-            </button>
-          </div>
-        )}
-      </div>
-
-      {toast && (
-        <div className="fixed right-6 bottom-6 z-50 max-w-xs rounded-xl border border-white/[0.08] bg-zinc-900 px-4 py-3 text-sm text-zinc-200 shadow-xl">
-          {toast}
-        </div>
+      {loi && (
+        <p className="rounded-lg border border-red-400/30 bg-red-400/5 px-3 py-2 text-sm text-red-300">
+          {loi}
+        </p>
       )}
+      {bao && (
+        <p className="rounded-lg border border-emerald-400/30 bg-emerald-400/5 px-3 py-2 text-sm text-emerald-300">
+          {bao}
+        </p>
+      )}
+
+      <section className="space-y-4 rounded-xl border border-white/10 bg-white/[0.02] p-5">
+        <label className="block text-sm">
+          <span className="mb-1 block text-white/60">Tên trung tâm</span>
+          <input
+            className={oNhap}
+            value={form.ten}
+            onChange={(e) => setForm((f) => ({ ...f, ten: e.target.value }))}
+          />
+        </label>
+
+        <label className="block text-sm">
+          <span className="mb-1 block text-white/60">Địa chỉ</span>
+          <input
+            className={oNhap}
+            value={form.diaChi ?? ""}
+            onChange={(e) => setForm((f) => ({ ...f, diaChi: e.target.value }))}
+          />
+        </label>
+
+        <div className="grid gap-4 sm:grid-cols-2">
+          <label className="block text-sm">
+            <span className="mb-1 block text-white/60">Điện thoại</span>
+            <input
+              className={oNhap}
+              value={form.dienThoai ?? ""}
+              onChange={(e) => setForm((f) => ({ ...f, dienThoai: e.target.value }))}
+            />
+          </label>
+          <label className="block text-sm">
+            <span className="mb-1 block text-white/60">Email</span>
+            <input
+              type="email"
+              className={oNhap}
+              value={form.email ?? ""}
+              onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
+            />
+          </label>
+        </div>
+
+        <label className="block text-sm">
+          <span className="mb-1 block text-white/60">Mã số thuế</span>
+          <input
+            className={oNhap}
+            value={form.maSoThue ?? ""}
+            onChange={(e) => setForm((f) => ({ ...f, maSoThue: e.target.value }))}
+          />
+        </label>
+      </section>
+
+      <section className="space-y-3 rounded-xl border border-white/10 bg-white/[0.02] p-5">
+        <div>
+          <h2 className="font-semibold">Vùng lương tối thiểu</h2>
+          <p className="mt-1 text-sm text-white/50">
+            Quyết định <strong>sàn đóng BHXH</strong> — lương đóng không được thấp hơn mức tối thiểu
+            của vùng. Chọn sai là tính sai mức đóng của cả trung tâm.
+          </p>
+        </div>
+        <select
+          className={oNhap}
+          value={form.vungLuongToiThieu}
+          onChange={(e) => setForm((f) => ({ ...f, vungLuongToiThieu: Number(e.target.value) }))}
+        >
+          {VUNG.map((v) => (
+            <option key={v.v} value={v.v}>
+              {v.nhan}
+            </option>
+          ))}
+        </select>
+      </section>
+
+      <button
+        onClick={luu}
+        disabled={dangLuu}
+        className="rounded-lg bg-white px-5 py-2.5 font-semibold text-black transition hover:bg-white/90 disabled:opacity-50"
+      >
+        {dangLuu ? "Đang lưu…" : "Lưu"}
+      </button>
     </div>
   );
 }
