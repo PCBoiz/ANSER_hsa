@@ -10,9 +10,9 @@ import { BoltIcon, ChartIcon, HomeIcon, ReceiptIcon, SettingsIcon, StaffIcon, Us
  */
 const MUC = [
   { nhan: "Trang chủ", icon: HomeIcon, href: "/dashboard" },
+  { nhan: "Sổ thu chi", icon: ChartIcon, href: "/dashboard/so-thu-chi" },
   { nhan: "Kho tài liệu", icon: ReceiptIcon, href: "/dashboard/tai-lieu" },
   { nhan: "Cài đặt", icon: SettingsIcon, href: "/dashboard/settings" },
-  { nhan: "Sổ thu chi", icon: ChartIcon, sapCo: "GĐ2" },
   { nhan: "Giáo viên · thù lao", icon: StaffIcon, sapCo: "GĐ3" },
   { nhan: "Học viên · học phí", icon: UsersIcon, sapCo: "GĐ5" },
   { nhan: "Tự động hoá", icon: BoltIcon, sapCo: "GĐ7" },
