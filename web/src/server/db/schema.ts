@@ -909,6 +909,15 @@ export const caiDatCongTy = pgTable("cai_dat_cong_ty", {
   maSoThue: text("ma_so_thue"),
   // Quyết định sàn đóng BHXH. Hà Nội nội thành là vùng I.
   vungLuongToiThieu: integer("vung_luong_toi_thieu").notNull().default(1),
+  /**
+   * Khai thuế theo tháng hay theo quý — đổi hẳn lịch nghĩa vụ.
+   *
+   * Theo tháng: hạn ngày 20 tháng sau. Theo quý: hạn ngày cuối tháng đầu quý
+   * sau. Đoán sai chu kỳ là sinh ra một lịch đúng hình thức nhưng sai mọi mốc,
+   * và khách tin nó. Mặc định 'quy' vì phần lớn doanh nghiệp nhỏ thuộc diện
+   * khai quý — nhưng đây là thứ PHẢI hỏi khách, không phải suy.
+   */
+  khaiThueTheo: text("khai_thue_theo").notNull().default("quy"),
   capNhatLuc: timestamp("cap_nhat_luc", { withTimezone: true }).notNull().defaultNow(),
 });
 

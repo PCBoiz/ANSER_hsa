@@ -1,0 +1,1 @@
+ALTER TABLE "cai_dat_cong_ty" ADD COLUMN "khai_thue_theo" text DEFAULT 'quy' NOT NULL;

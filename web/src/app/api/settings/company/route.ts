@@ -26,6 +26,12 @@ export async function PATCH(request: Request) {
   for (const k of ["diaChi", "dienThoai", "email", "maSoThue"] as const) {
     if (body[k] !== undefined) patch[k] = body[k] || null;
   }
+  if (body.khaiThueTheo !== undefined) {
+    if (!["thang", "quy"].includes(String(body.khaiThueTheo))) {
+      return NextResponse.json({ message: "Khai thuế theo phải là 'thang' hoặc 'quy'." }, { status: 400 });
+    }
+    patch.khaiThueTheo = String(body.khaiThueTheo);
+  }
   if (body.vungLuongToiThieu !== undefined) {
     const v = Number(body.vungLuongToiThieu);
     if (![1, 2, 3, 4].includes(v)) {

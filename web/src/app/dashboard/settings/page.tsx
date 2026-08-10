@@ -9,6 +9,7 @@ type CaiDat = {
   email: string | null;
   maSoThue: string | null;
   vungLuongToiThieu: number;
+  khaiThueTheo: string;
 };
 
 const RONG: CaiDat = {
@@ -18,6 +19,7 @@ const RONG: CaiDat = {
   email: "",
   maSoThue: "",
   vungLuongToiThieu: 1,
+  khaiThueTheo: "quy",
 };
 
 /** Sàn đóng BHXH theo vùng — con số thật đọc từ bảng tham_so_phap_ly, không ghi ở đây. */
@@ -50,6 +52,7 @@ export default function TrangCaiDat() {
       email: caiDat.email ?? "",
       maSoThue: caiDat.maSoThue ?? "",
       vungLuongToiThieu: caiDat.vungLuongToiThieu ?? 1,
+      khaiThueTheo: caiDat.khaiThueTheo ?? "quy",
     });
     setDangTai(false);
   }, []);
@@ -168,6 +171,24 @@ export default function TrangCaiDat() {
               {v.nhan}
             </option>
           ))}
+        </select>
+      </section>
+
+      <section className="space-y-3 rounded-xl border border-white/10 bg-white/[0.02] p-5">
+        <div>
+          <h2 className="font-semibold">Khai thuế theo</h2>
+          <p className="mt-1 text-sm text-white/50">
+            Quyết định <strong>mọi mốc trong Lịch nghĩa vụ</strong>. Theo tháng thì hạn là ngày 20
+            tháng sau; theo quý thì hạn là ngày cuối tháng đầu quý sau. Chọn sai là cả lịch sai.
+          </p>
+        </div>
+        <select
+          className={oNhap}
+          value={form.khaiThueTheo}
+          onChange={(e) => setForm((f) => ({ ...f, khaiThueTheo: e.target.value }))}
+        >
+          <option value="quy">Theo quý</option>
+          <option value="thang">Theo tháng</option>
         </select>
       </section>
 

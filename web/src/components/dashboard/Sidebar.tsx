@@ -14,9 +14,10 @@ const MUC = [
   { nhan: "Kho tài liệu", icon: ReceiptIcon, href: "/dashboard/tai-lieu" },
   { nhan: "Cài đặt", icon: SettingsIcon, href: "/dashboard/settings" },
   { nhan: "Giáo viên · thù lao", icon: StaffIcon, href: "/dashboard/thu-lao" },
+  { nhan: "Lịch nghĩa vụ", icon: BoltIcon, href: "/dashboard/nghia-vu" },
   { nhan: "Hồ sơ TT29", icon: ReceiptIcon, href: "/dashboard/tt29" },
   { nhan: "Học viên · học phí", icon: UsersIcon, sapCo: "GĐ5" },
-  { nhan: "Tự động hoá", icon: BoltIcon, sapCo: "GĐ7" },
+  { nhan: "Tự động hoá", icon: BoltIcon, sapCo: "sau" },
 ];
 
 export default function Sidebar() {

@@ -22,6 +22,7 @@ export async function capNhatCaiDatCongTy(
     email: string | null;
     maSoThue: string | null;
     vungLuongToiThieu: number;
+    khaiThueTheo: string;
   }>,
 ) {
   if (patch.vungLuongToiThieu !== undefined && ![1, 2, 3, 4].includes(patch.vungLuongToiThieu)) {
