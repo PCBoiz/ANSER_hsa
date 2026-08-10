@@ -34,3 +34,14 @@ export function layKhoaKy(): string {
   }
   return khoa;
 }
+
+export function layChuoiKetNoi(): string {
+  const url = process.env.DATABASE_URL;
+  if (!url) {
+    throw new Error(
+      "Thiếu DATABASE_URL. Đặt vào web/.env.local (lúc phát triển) " +
+        "hoặc vào .env cạnh docker-compose.yml (lúc triển khai).",
+    );
+  }
+  return url;
+}

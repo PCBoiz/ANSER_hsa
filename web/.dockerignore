@@ -1,0 +1,24 @@
+# Bí mật — tuyệt đối không vào ảnh. Một lớp ảnh Docker là VĨNH VIỄN: xoá file ở
+# lớp sau cũng không xoá được nó khỏi lớp trước, ai kéo được ảnh là đọc được.
+.env
+.env.*
+!.env.example
+.dev.vars
+
+node_modules
+.next
+.open-next
+.wrangler
+out
+coverage
+
+.git
+.gitignore
+Dockerfile
+.dockerignore
+
+# Test không cần cho bản chạy, và bộ ma trận phân quyền còn tạo tài khoản thật.
+tests
+
+*.md
+!README.md

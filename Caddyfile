@@ -1,0 +1,32 @@
+# Caddy tự xin và tự gia hạn chứng chỉ Let's Encrypt cho tên miền dưới đây.
+# Không cần certbot, không cần cron, không cần nhớ ngày hết hạn.
+#
+# Điều kiện: cổng 80 và 443 phải vào được từ Internet, và TEN_MIEN phải đang trỏ
+# về đúng IP máy này. Trên Oracle Cloud phải mở ở HAI chỗ — Security List của
+# VCN, và iptables ngay trong máy (ảnh Oracle chặn sẵn mọi cổng trừ 22). Quên
+# chỗ thứ hai là triệu chứng "DNS đúng rồi mà vẫn không vào được".
+
+{$TEN_MIEN} {
+	encode zstd gzip
+
+	reverse_proxy app:3000 {
+		health_uri /api/health
+		health_interval 30s
+	}
+
+	# Ứng dụng đã tự đặt phần lớn header an toàn; ba dòng này bù phần Caddy
+	# đứng trước nên biết rõ hơn.
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		-Server
+	}
+
+	log {
+		output file /data/truy-cap.log {
+			roll_size 10MiB
+			roll_keep 5
+		}
+	}
+}

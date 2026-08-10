@@ -7,8 +7,12 @@ export async function register() {
   // Gọi `moiTruong` chứ KHÔNG gọi `auth`: file này được biên dịch cho cả runtime
   // edge, và kéo `jsonwebtoken` vào đó là `require('crypto')` không phân giải
   // được → instrumentation hỏng → MỌI route trả 500, kể cả /api/health.
-  const { layKhoaKy } = await import("@/server/moiTruong");
+  const { layKhoaKy, layChuoiKetNoi } = await import("@/server/moiTruong");
   layKhoaKy();
+  // Kết nối DB nay mở lười (xem db/client.ts) nên phải kiểm biến ở ĐÂY, bằng
+  // tay. Không có dòng này thì thiếu DATABASE_URL sẽ lặng lẽ qua lúc khởi động
+  // rồi mới 500 ở yêu cầu đầu tiên của người dùng.
+  layChuoiKetNoi();
 
   /**
    * Gieo dữ liệu nền — CHỈ KHI CHƯA CÓ.
