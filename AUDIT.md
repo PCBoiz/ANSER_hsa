@@ -99,7 +99,7 @@ hỏng vì lý do khác thì vẫn ghi một nửa. Mẫu sửa đã có sẵn, 
 
 ## 2. Cần bàn — không tự quyết
 
-### 2.1. ⚠️ Trần tải file 4,5MB của Vercel so với trần 25MB đang đặt
+### 2.1. ~~Trần tải file 4,5MB của Vercel~~ — ĐÃ XỬ LÝ 10/08
 
 **Đã xác minh:** giới hạn body của Vercel Function là **4,5MB, ở tầng hạ tầng, không
 đổi được bằng `vercel.json`**. Vượt là `413 FUNCTION_PAYLOAD_TOO_LARGE`.
@@ -115,8 +115,41 @@ Ba đường:
 | Hạ trần xuống 4MB | không đổi kiến trúc | scan nhiều trang là vượt, khách không hiểu vì sao |
 | Giữ VPS cho riêng đường tải | không đổi gì | mất lý do lên Vercel |
 
-Tôi nghiêng về **ký sẵn tải thẳng**, vì nó đúng cả trên Vercel lẫn VPS, và về sau
-không phải làm lại.
+**Đã chọn ký sẵn tải thẳng, và thêm một bước xác nhận để gỡ cả hai nhược điểm.**
+
+Hai nhược điểm ban đầu — mã băm do client khai, và trần dung lượng chỉ chặn được ở
+trình duyệt — đều biến mất nhờ bước ba:
+
+```
+1. Trình duyệt xin URL     → server kiểm quyền, cấp URL cho ĐÚNG một đường dẫn, sống 10 phút
+2. Trình duyệt PUT thẳng   → R2 nhận file, server không gánh byte nào
+3. Trình duyệt báo xong    → server HEAD lên R2, lấy kích thước và ETag THẬT rồi mới ghi sổ
+```
+
+Bước 3 không phải thủ tục. Trình duyệt báo "xong" là **một lời khai**, và mọi quyết
+định đều dựa vào con số server tự đọc:
+
+| Kiểm thật | Kết quả |
+|---|---|
+| Đẩy 27MB nhưng client khai 100 byte | server HEAD ra 27.000.000 → **413 và xoá object** |
+| Object có bị xoá thật khỏi R2 không | liệt kê bucket: không còn file nào vượt trần |
+| Trùng nội dung (ETag do R2 tính) | 409, xoá object mới, trả về bản đã có |
+| Xác nhận mà chưa hề đẩy file | 400, không ghi dòng nào trỏ vào hư không |
+| Kế toán bịa đường dẫn `hop_dong` rồi xác nhận | **403** — `loai` đọc ngược từ đường dẫn đã ký, không lấy từ thân yêu cầu |
+| Tải về sau đó | 200, nội dung khớp từng byte |
+
+Chỗ đáng chú ý nhất là dòng áp chót. Nếu bước xác nhận tin `loai` client gửi kèm thì
+kế toán xin URL cho `chung_tu` — thứ họ được phép — rồi khai thành `hop_dong` lúc xác
+nhận. Đường dẫn bị khoá cứng trong chữ ký nên đọc ngược từ đó là nguồn duy nhất tin
+được. `phanTichDuongDan` có 7 test riêng.
+
+**Còn lại một chuyện nhỏ:** trình duyệt đẩy xong rồi tắt tab trước khi xác nhận thì R2
+giữ một object không bản ghi nào trỏ tới. Nó vô hình và chỉ tốn vài KB, dọn được bằng
+một lượt đối chiếu khoá trên R2 với cột `duong_dan` — chưa làm.
+
+**Việc của anh:** bật CORS trên bucket `anser-hsa` với `AllowedOrigins` gồm
+`http://localhost:3000`. Chưa bật thì `curl` vẫn chạy (đã kiểm) nhưng trình duyệt sẽ
+từ chối — và giao diện nói đúng chỗ đó thay vì đổ lỗi cho server.
 
 ### 2.2. 16/36 bảng chưa có dòng code nào đụng tới
 

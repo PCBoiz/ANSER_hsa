@@ -5,6 +5,7 @@ import {
   hienKichThuoc,
   laLoaiHopLe,
   lamSachTenFile,
+  phanTichDuongDan,
   vaiTroToiThieuXem,
 } from "@/server/tinhToan/taiLieu";
 
@@ -106,5 +107,55 @@ describe("hienKichThuoc", () => {
     expect(hienKichThuoc(512)).toBe("512 B");
     expect(hienKichThuoc(2048)).toBe("2.0 KB");
     expect(hienKichThuoc(5 * 1024 * 1024)).toBe("5.0 MB");
+  });
+});
+
+/**
+ * Bước xác nhận sau khi trình duyệt đẩy thẳng lên R2 KHÔNG được tin `loai` và
+ * `ky` client gửi kèm — nếu tin thì kế toán xin URL cho `chung_tu`, thứ họ được
+ * phép, rồi lúc xác nhận khai thành loại khác. Đường dẫn đã bị khoá cứng trong
+ * chữ ký nên nó là nguồn duy nhất tin được.
+ */
+describe("phanTichDuongDan", () => {
+  it("đọc ngược đúng kỳ, loại và id", () => {
+    const id = "2f8a1c34-5b6d-4e7f-8a9b-0c1d2e3f4a5b";
+    expect(phanTichDuongDan(`2026-07/sao_ke/${id}-Sao-ke-VCB.xlsx`)).toEqual({
+      ky: "2026-07",
+      loai: "sao_ke",
+      id,
+    });
+  });
+
+  it("hiểu ngăn không thuộc kỳ nào", () => {
+    const id = "2f8a1c34-5b6d-4e7f-8a9b-0c1d2e3f4a5b";
+    expect(phanTichDuongDan(`khong-ky/giay_phep/${id}-GP.pdf`)?.ky).toBeNull();
+  });
+
+  it("từ chối loại bịa — không cho lách quyền qua đường dẫn", () => {
+    const id = "2f8a1c34-5b6d-4e7f-8a9b-0c1d2e3f4a5b";
+    expect(phanTichDuongDan(`2026-07/linh_tinh/${id}-a.pdf`)).toBeNull();
+  });
+
+  it("từ chối kỳ sai định dạng", () => {
+    const id = "2f8a1c34-5b6d-4e7f-8a9b-0c1d2e3f4a5b";
+    expect(phanTichDuongDan(`T7-2026/chung_tu/${id}-a.pdf`)).toBeNull();
+  });
+
+  it("từ chối đường dẫn không có id dạng uuid", () => {
+    expect(phanTichDuongDan("2026-07/chung_tu/khong-phai-uuid-a.pdf")).toBeNull();
+  });
+
+  it("từ chối đường dẫn thiếu tầng hoặc rỗng", () => {
+    for (const x of ["", "chung_tu/a.pdf", "2026-07/chung_tu/", "/"]) {
+      expect(phanTichDuongDan(x), x).toBeNull();
+    }
+  });
+
+  it("khớp được với đường dẫn do chính duongDanKho sinh ra", () => {
+    const id = "2f8a1c34-5b6d-4e7f-8a9b-0c1d2e3f4a5b";
+    for (const ky of ["2026-07", null]) {
+      const d = duongDanKho({ loai: "hop_dong", ky, id, ten: "Hợp đồng lao động.pdf" });
+      expect(phanTichDuongDan(d)).toEqual({ ky, loai: "hop_dong", id });
+    }
   });
 });

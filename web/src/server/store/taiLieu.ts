@@ -17,6 +17,22 @@ export function bamNoiDung(noiDung: Uint8Array): string {
   return createHash("sha256").update(noiDung).digest("hex");
 }
 
+/**
+ * Dựng đường dẫn cho một file SẮP được đẩy lên, chưa ghi sổ.
+ *
+ * Sinh `id` ở đây để đường dẫn trên kho và khoá chính là một — nhưng KHÔNG ghi
+ * bản ghi. Bản ghi chỉ ra đời ở bước xác nhận, sau khi server đã tự hỏi R2 xem
+ * file có thật không. Nhờ vậy sổ không bao giờ có dòng trỏ vào hư không.
+ *
+ * Đổi lại: trình duyệt đẩy xong rồi tắt tab thì R2 còn một object không bản ghi
+ * nào trỏ tới. Nó vô hình và chỉ tốn vài KB; dọn được bằng một lượt đối chiếu
+ * khoá trên R2 với cột `duong_dan`, chưa làm.
+ */
+export function dungDuongDan(input: { ten: string; loai: LoaiTaiLieu; ky: string | null }) {
+  const id = crypto.randomUUID();
+  return { id, duongDan: duongDanKho({ loai: input.loai, ky: input.ky, id, ten: input.ten }) };
+}
+
 /** Loại tài liệu một vai trò được phép nhìn thấy. Lọc ở tầng truy vấn, không ở UI. */
 export function loaiDuocXem(vaiTro: VaiTro): LoaiTaiLieu[] {
   const thuTu: VaiTro[] = ["tro_giang", "ke_toan", "quan_ly", "admin"];
@@ -51,6 +67,8 @@ export async function timTheoBam(bam: string): Promise<TaiLieu | undefined> {
 }
 
 export async function ghiTaiLieu(input: {
+  id?: string;
+  duongDan?: string;
   ten: string;
   loai: LoaiTaiLieu;
   ky: string | null;
@@ -61,10 +79,9 @@ export async function ghiTaiLieu(input: {
   ghiChu?: string | null;
   nguon?: "mau" | "that";
 }): Promise<{ ban: TaiLieu; duongDan: string }> {
-  // Sinh id trước để đường dẫn trên kho và khoá chính là một — không có bản ghi
-  // nào trỏ tới một file không tồn tại, và ngược lại.
-  const id = crypto.randomUUID();
-  const duongDan = duongDanKho({ loai: input.loai, ky: input.ky, id, ten: input.ten });
+  const id = input.id ?? crypto.randomUUID();
+  const duongDan =
+    input.duongDan ?? duongDanKho({ loai: input.loai, ky: input.ky, id, ten: input.ten });
 
   const rows = await db
     .insert(taiLieu)

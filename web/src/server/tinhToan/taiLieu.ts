@@ -95,6 +95,32 @@ export function duongDanKho(p: { loai: LoaiTaiLieu; ky: string | null; id: strin
   return `${nganKy}/${p.loai}/${p.id}-${lamSachTenFile(p.ten)}`;
 }
 
+/**
+ * Đọc ngược `loai`, `ky`, `id` ra khỏi đường dẫn đã ký.
+ *
+ * Bước xác nhận sau khi trình duyệt đẩy file KHÔNG được tin `loai` và `ky` mà
+ * client gửi kèm. Nếu tin thì kế toán xin một URL cho `chung_tu` — thứ họ có
+ * quyền — rồi lúc xác nhận khai thành loại khác, và bản ghi vào sổ với một loại
+ * họ không được phép đặt. Đường dẫn thì đã bị khoá cứng trong chữ ký, nên đọc
+ * ngược từ đó là nguồn duy nhất tin được.
+ *
+ * Trả `null` khi đường dẫn không đúng khuôn — coi như yêu cầu bịa.
+ */
+export function phanTichDuongDan(
+  duongDan: string,
+): { ky: string | null; loai: LoaiTaiLieu; id: string } | null {
+  const m = /^([^/]+)\/([^/]+)\/([0-9a-f-]{36})-(.+)$/i.exec(duongDan);
+  if (!m) return null;
+  const [, nganKy, loai, id] = m;
+  if (!laLoaiHopLe(loai)) return null;
+  if (nganKy !== "khong-ky") {
+    const { ky, loi } = chuanHoaKy(nganKy);
+    if (loi || ky !== nganKy) return null;
+    return { ky, loai, id };
+  }
+  return { ky: null, loai, id };
+}
+
 const DON_VI = ["B", "KB", "MB", "GB"];
 
 export function hienKichThuoc(byte: number | null | undefined): string {
