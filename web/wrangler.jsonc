@@ -1,0 +1,15 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "anser-hsa",
+  "main": ".open-next/worker.js",
+  // nodejs_compat là thứ quyết định `jsonwebtoken` sống hay chết trên Workers:
+  // nó cấp `node:crypto`. Không có cờ này thì y hệt lỗi đã làm sập mọi route hôm
+  // trước, chỉ khác chỗ xảy ra.
+  "compatibility_date": "2026-08-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "assets": {
+    "directory": ".open-next/assets",
+    "binding": "ASSETS"
+  },
+  "observability": { "enabled": true }
+}
