@@ -43,6 +43,13 @@
       "when": 1786340049369,
       "tag": "0005_them_chu_ky_khai_thue",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1786341710144,
+      "tag": "0006_lop_hoc_chua_duoc_lop_thieu_thong_tin",
+      "breakpoints": true
     }
   ]
 }

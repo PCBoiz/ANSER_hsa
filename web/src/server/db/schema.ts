@@ -260,7 +260,12 @@ export const lopHoc = pgTable(
     id: uuid("id").primaryKey().defaultRandom(),
     ma: text("ma").notNull().unique(),
     ten: text("ten").notNull(),
-    mon: text("mon").notNull(), // bắt buộc công khai theo TT29
+    // NULLABLE có chủ đích, dù TT29 bắt buộc công khai môn học.
+    //
+    // Lớp chưa ghi môn là trạng thái KHÔNG TUÂN THỦ — và đó chính là thứ
+    // soi_ho_so_tt29 sinh ra để phát hiện. Ép NOT NULL ở đây thì hệ thống
+    // không biểu diễn nổi trạng thái sai, nên bộ soi không bao giờ bắt được nó.
+    mon: text("mon"),
     khoiLop: text("khoi_lop"),
     soBuoi: integer("so_buoi"),
     hocPhiMoiBuoi: bigint("hoc_phi_moi_buoi", { mode: "number" }), // NULL = thu trọn khoá
@@ -274,8 +279,17 @@ export const lopHoc = pgTable(
   },
   (t) => [
     nguonCheck("lop_hoc"),
-    // Một trong hai cách thu phải có, nếu không thì không tính được học phí.
-    check("lop_hoc_co_hoc_phi", sql`${t.hocPhiMoiBuoi} is not null or ${t.hocPhiCaKhoa} is not null`),
+    // BỎ ràng buộc "phải có một trong hai cách thu".
+    //
+    // Nó tưởng là chặt chẽ nhưng thật ra chặn đúng thứ cần phát hiện: TT29 bắt
+    // công khai mức thu học phí, nên "lớp chưa chốt học phí" là một vi phạm có
+    // thật và hay gặp. Ràng buộc làm trạng thái đó không biểu diễn được, kéo
+    // theo soi_ho_so_tt29 không bao giờ đếm ra nó — và bộ dữ liệu mẫu không
+    // gieo nổi lỗi đó để chứng minh bộ soi chạy.
+    //
+    // Bài học: một ràng buộc khiến trạng thái sai KHÔNG BIỂU DIỄN ĐƯỢC cũng
+    // khiến nó KHÔNG PHÁT HIỆN ĐƯỢC. Chỗ nào phần mềm có nhiệm vụ soi lỗi thì
+    // chỗ đó phải chứa được lỗi.
   ],
 );
 

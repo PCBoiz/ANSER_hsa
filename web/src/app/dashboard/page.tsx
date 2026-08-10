@@ -1,4 +1,6 @@
 import { desc } from "drizzle-orm";
+import NutDuLieuMau from "@/components/dashboard/NutDuLieuMau";
+import { coDuLieuMau } from "@/server/duLieuMau/gieo";
 import { db } from "@/server/db/client";
 import { bacThueTncn, thamSoPhapLy } from "@/server/db/schema";
 import { layNguoiDungTuPhien } from "@/server/session";
@@ -22,6 +24,7 @@ export default async function TrangChu() {
   const bac = await db.select().from(bacThueTncn).orderBy(bacThueTncn.bac);
   const kiemTra = await kiemTraBacThue();
   const chuaDuyet = await demChuaDuyet();
+  const coMau = await coDuLieuMau();
 
   return (
     <div className="space-y-6">
@@ -53,6 +56,20 @@ export default async function TrangChu() {
         </section>
       )}
 
+      {/* Banner này phải đứng TRÊN mọi con số. Khách chụp màn hình một bảng
+          doanh thu toàn số giả rồi tưởng là thật thì với sản phẩm kế toán đó
+          không phải phiền toái — đó là mất khách. */}
+      {coMau && (
+        <section className="rounded-xl border border-amber-400/40 bg-amber-400/10 p-4">
+          <p className="font-semibold text-amber-200">Đang có dữ liệu mẫu trong hệ thống</p>
+          <p className="mt-1 text-sm text-amber-100/70">
+            Mọi con số ở các màn hình khác đang lẫn dữ liệu mẫu. Đây là bộ đề có đáp án dựng sẵn để
+            bấm thử — <strong>không phải số liệu thật</strong>. Xoá nó đi thì dữ liệu đã nhập tay vẫn
+            còn nguyên, vì mỗi dòng đều biết mình là mẫu hay thật.
+          </p>
+        </section>
+      )}
+
       {chuaDuyet.thamSo + chuaDuyet.bacThue > 0 && (
         <section className="rounded-xl border border-sky-400/30 bg-sky-400/5 p-4">
           <h2 className="font-semibold text-sky-200">Chưa có kế toán rà lại</h2>
@@ -67,6 +84,16 @@ export default async function TrangChu() {
           </p>
         </section>
       )}
+
+      <section className="rounded-xl border border-white/10 bg-white/[0.02] p-5">
+        <h2 className="font-semibold">Dữ liệu mẫu</h2>
+        <p className="mb-3 mt-1 text-sm text-white/50">
+          Một trung tâm hư cấu với lỗi gieo sẵn: giáo viên trường công chưa báo cáo hiệu trưởng, lớp
+          thiếu môn, lớp thiếu học phí, ba khoản thu chưa quyết kê khai, một khoản chi không hoá đơn.
+          Các bộ soi phải tìm ra đúng ngần ấy và không gắn cờ oan thứ gì khác.
+        </p>
+        <NutDuLieuMau dangCo={coMau} />
+      </section>
 
       <section className="rounded-xl border border-white/10 bg-white/[0.02] p-5">
         <div className="mb-4 flex items-baseline justify-between">
