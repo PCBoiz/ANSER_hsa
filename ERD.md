@@ -376,3 +376,122 @@ nhat_ky_thay_doi               append-only, ai sửa gì lúc nào (B3)
 Đợt 1 và 2 nên gộp làm một migration: **hiện chưa có một dòng dữ liệu nghiệp vụ nào
 trong DB**, nên đây là thời điểm rẻ nhất để sửa mô hình. Mỗi ngày trôi qua sau khi
 khách bắt đầu nhập, giá của mỗi thay đổi ở mục A tăng lên.
+
+---
+
+## 5. Quyết định — chốt 10/08/2026
+
+Bốn lựa chọn của chủ dự án, và đặc tả cụ thể của từng cái. Migration `0003` làm trọn gói.
+
+### 5.1. Một sổ thu chi duy nhất, nguồn đa hình
+
+`khoan_thu` là **sổ tổng**. Học phí nhập tay bây giờ ghi thẳng vào đây; tới GĐ5 khi có
+`thu_hoc_phi` nối với đăng ký và VietQR thì nó ghi vào **cùng sổ này** với
+`nguon_loai='thu_hoc_phi'`.
+
+> Lý do chọn một sổ: mọi báo cáo doanh thu cộng ở **một nơi**. Hai sổ nghĩa là mỗi câu
+> hỏi doanh thu đều phải nhớ cộng cả hai — và quên một vế là loại lỗi ra số nhỏ hơn
+> thực tế mà không có gì báo.
+
+```
+khoan_thu(
+  id, ngay, ky, so_tien CHECK > 0, mo_ta,
+  dien_thue      CHECK in ('khong_chiu','gtgt_5','gtgt_10','chua_quyet')  -- 5.2
+  dien_ke_khai   CHECK in ('da_ke_khai','chua_ke_khai','chua_quyet') default 'chua_quyet'
+  nguon_loai     CHECK in ('tu_nhap','thu_hoc_phi','ban_tai_lieu','cho_thue','khac')
+  nguon_id       CHECK: nguon_loai='tu_nhap' thì NULL, còn lại NOT NULL
+  nguon          'mau' | 'that'
+)
+
+khoan_chi(
+  id, ngay, ky, so_tien CHECK > 0, mo_ta,
+  nhom            CHECK in ('thue_mat_bang','dien_nuoc','thu_lao','luong','marketing',
+                            'thiet_bi','van_phong_pham','khac')
+  duoc_tru        boolean default false            -- 5.4, chi phí được trừ khi tính TNDN
+  ly_do_khong_tru text                             -- bắt buộc khi duoc_tru = false
+  nguon_loai, nguon_id, nguon
+)
+```
+
+### 5.2. Diện thuế nằm trên dòng, bảng riêng chỉ ghi căn cứ
+
+Giải A2. Mỗi `khoan_thu` là **một dòng một diện** — phiếu thu gồm học phí và bán tài
+liệu được nhập thành hai dòng ngay từ đầu, đúng cách kế toán ghi sổ.
+
+`doanh_thu_phan_loai` **đổi vai**: không còn giữ số tiền và diện thuế nữa, chỉ giữ
+**căn cứ pháp lý và người duyệt** cho những dòng cần giải trình. Bỏ cặp đa hình, FK
+thẳng tới `khoan_thu`.
+
+```
+can_cu_dien_thue(
+  id, khoan_thu_id FK → khoan_thu,
+  can_cu_phap_ly, nguoi_duyet_id FK → nguoi_dung, duyet_luc, ghi_chu
+)
+```
+
+> Vì sao không bỏ hẳn bảng: ca khó cần ghi lại **vì sao** xếp vào diện đó và **ai**
+> chịu trách nhiệm. Ca dễ thì không cần dòng nào — 90% dòng học phí là "không chịu
+> thuế" hiển nhiên, ép mỗi dòng một bản ghi căn cứ chỉ tạo rác.
+
+### 5.3. Khoá kỳ và nhật ký thay đổi — làm ngay
+
+```
+ky_ke_toan(
+  ky PK 'YYYY-MM',
+  trang_thai CHECK in ('mo','dang_chot','da_khoa'),
+  khoa_luc, khoa_boi_id FK → nguoi_dung, ghi_chu
+)
+```
+
+Kỳ `da_khoa` thì mọi đường ghi vào `khoan_thu` / `khoan_chi` / `thu_lao` / `bang_luong`
+của kỳ đó **bị từ chối**, không âm thầm bỏ qua. Muốn sửa thì phải mở khoá, và việc mở
+khoá tự vào nhật ký.
+
+```
+nhat_ky_thay_doi(
+  id, bang, ban_ghi_id, hanh_dong CHECK in ('them','sua','xoa'),
+  truoc jsonb, sau jsonb, nguoi_dung_id FK → nguoi_dung, tao_luc
+)
+```
+
+**Append-only.** Không có đường sửa hay xoá trong code; ai cần cưỡng chế ở tầng DB thì
+thêm `RULE` chặn `UPDATE`/`DELETE` — drizzle không quản được thứ đó nên phải viết tay
+trong migration và ghi chú lại.
+
+> Vì sao làm ngay chứ không đợi: thêm nhật ký sau khi đã có dữ liệu thì **mất đúng phần
+> lịch sử đầu tiên** — quãng khách vừa bắt đầu nhập, cũng là quãng sai nhiều nhất.
+
+### 5.4. Quyền xoá dữ liệu cá nhân — ẩn danh hoá
+
+Hai nghĩa vụ mâu thuẫn thật: Luật 91/2025 cho cá nhân quyền yêu cầu xoá, luật kế toán
+bắt giữ chứng từ. Ẩn danh hoá thoả được cả hai.
+
+```
+hoc_vien.an_danh_luc   timestamptz
+phu_huynh.an_danh_luc  timestamptz
+```
+
+Khi thực hiện: `ho_ten` → `'Đã ẩn danh'`, `dien_thoai`/`email`/`ngay_sinh`/`truong` →
+`NULL`, **giữ nguyên `ma`** để chứng từ cũ còn truy về được. Bản ghi tài chính không
+đụng tới. Ghi một dòng vào `nhat_ky_thay_doi`.
+
+> `ma` giữ lại có phải vẫn là dữ liệu cá nhân không? Không, nếu nó là mã nội bộ dạng
+> `HV0142` chứ không phải số điện thoại hay CCCD. Đây là ràng buộc thật lên cách sinh
+> mã học viên — và cũng là lý do mã đó **không được** lấy từ thông tin cá nhân.
+
+### 5.5. Cùng migration `0003`, dọn nốt mức A và C
+
+| Mã | Sửa |
+|---|---|
+| A1 | `khop_thu` thêm `so_tien` — thành bảng phân bổ nhiều–nhiều, kèm ràng buộc tổng phân bổ ≤ số tiền giao dịch |
+| A3 | `giao_dich_ngan_hang` thêm `chieu` CHECK `in ('vao','ra')`, giữ `so_tien > 0` |
+| A4 | `buoi_day` thêm `thu_lao_id` FK nullable — một buổi thuộc tối đa một bảng thù lao |
+| C1 | `hoc_vien_phu_huynh` thêm PK ghép `(hoc_vien_id, phu_huynh_id)` |
+| C2 | Thêm 4 khoá ngoại còn thiếu |
+| C3 | CHECK định dạng `ky ~ '^\d{4}-\d{2}$'` trên mọi cột kỳ |
+| C4 | `hoc_vien.ma_ngoai` thành UNIQUE (nullable) |
+| C5 | Nới CHECK `bang_luong`: thêm `phu_cap`, `thuong`, `khau_tru_khac` rồi cân đối lại |
+| C6 | Chỉ mục cho `ky`, `ngay`, `nguon_loai` trên các bảng sổ |
+
+**Sau migration `0003`, lược đồ đi từ 32 lên khoảng 37 bảng** và không còn vấn đề mức A
+nào. Đây là bản chốt để bắt đầu GĐ2.
