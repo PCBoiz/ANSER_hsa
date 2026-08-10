@@ -8,6 +8,13 @@
       "when": 1786305674504,
       "tag": "0000_abnormal_the_professor",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1786331467339,
+      "tag": "0001_sticky_james_howlett",
+      "breakpoints": true
     }
   ]
 }

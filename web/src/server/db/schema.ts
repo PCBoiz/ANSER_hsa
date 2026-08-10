@@ -562,6 +562,21 @@ export const doanhThuPhanLoai = pgTable(
     soTien: bigint("so_tien", { mode: "number" }).notNull(),
     dienThue: text("dien_thue").notNull(), // 'khong_chiu' | 'gtgt_5' | 'gtgt_10'
     canCuPhapLy: text("can_cu_phap_ly").notNull(),
+    /**
+     * Trung tâm chạy hai sổ: sổ quản trị đầy đủ và sổ thuế nộp cơ quan, chênh
+     * nhau ở doanh thu. Cột này GHI LẠI SỰ THẬT đó, không phải để giấu:
+     *
+     *  - Kho dữ liệu vẫn đầy đủ. Chủ trung tâm thấy CẢ HAI con số cạnh nhau,
+     *    nên biết lãi thật là bao nhiêu — thứ hiện giờ không ai nói được.
+     *  - Bản kết xuất sang MISA phải NÊU RÕ đã loại bao nhiêu dòng và tổng bao
+     *    nhiêu. Không có đường nào tạo ra một bản xuất lặng lẽ bỏ dòng.
+     *  - `doi_chieu_misa` chỉ đối chiếu trong phần 'da_ke_khai'. Đó mới đúng
+     *    việc của nó: soi sai sót nhập liệu. Đối chiếu cả phần chưa kê khai chỉ
+     *    sinh ra một danh sách mà không ai muốn nó tồn tại.
+     *
+     * 'chua_quyet' = chưa ai quyết, KHÁC 'chua_ke_khai' là đã quyết không kê.
+     */
+    dienKeKhai: text("dien_ke_khai").notNull().default("chua_quyet"),
     nguoiDuyetId: uuid("nguoi_duyet_id").references(() => nguoiDung.id, { onDelete: "set null" }),
     duyetLuc: timestamp("duyet_luc", { withTimezone: true }),
     nguon: nguon(),
@@ -572,6 +587,52 @@ export const doanhThuPhanLoai = pgTable(
     unique("doanh_thu_nguon").on(t.nguonLoai, t.nguonId),
     check("doanh_thu_nguon_loai_hop_le", sql`${t.nguonLoai} in ('thu_hoc_phi','ban_tai_lieu','cho_thue','khac')`),
     check("doanh_thu_dien_hop_le", sql`${t.dienThue} in ('khong_chiu','gtgt_5','gtgt_10')`),
+    check(
+      "doanh_thu_dien_ke_khai_hop_le",
+      sql`${t.dienKeKhai} in ('da_ke_khai','chua_ke_khai','chua_quyet')`,
+    ),
+  ],
+);
+
+/* ══════════════════════════ kho chứng từ và tài liệu ══════════════════════
+ * Chị Mai: "HSA chỉ là của ai người đó giữ trên máy cá nhân và gg drive của
+ * doanh nghiệp" — chứng từ, hợp đồng, bản xuất MISA nằm rải rác, không ai tìm
+ * lại được. Đây là mảng chiến lược v1 và v2 đều không có, mà lại là nỗi đau
+ * khách tự nói ra trước.
+ * ═════════════════════════════════════════════════════════════════════════ */
+
+export const taiLieu = pgTable(
+  "tai_lieu",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    ten: text("ten").notNull(),
+    loai: text("loai").notNull(),
+    // 'YYYY-MM' hoặc 'YYYY'. NULL = tài liệu không thuộc kỳ nào (giấy phép, điều lệ).
+    ky: text("ky"),
+    // Nối về bản ghi nghiệp vụ nếu có — bài học 4, cặp nguồn đa hình.
+    nguonLoai: text("nguon_loai"),
+    nguonId: uuid("nguon_id"),
+    duongDan: text("duong_dan").notNull(),
+    dinhDang: text("dinh_dang"),
+    kichThuoc: bigint("kich_thuoc", { mode: "number" }),
+    // Băm nội dung — tải lại đúng file cũ thì báo trùng thay vì nhân đôi kho.
+    bamNoiDung: text("bam_noi_dung"),
+    nguoiTaiLenId: uuid("nguoi_tai_len_id").references(() => nguoiDung.id, { onDelete: "set null" }),
+    ghiChu: text("ghi_chu"),
+    nguon: nguon(),
+    taoLuc: taoLuc(),
+  },
+  (t) => [
+    nguonCheck("tai_lieu"),
+    unique("tai_lieu_bam").on(t.bamNoiDung),
+    check(
+      "tai_lieu_loai_hop_le",
+      sql`${t.loai} in ('chung_tu','hop_dong','ban_xuat_misa','to_khai','giay_phep','sao_ke','khac')`,
+    ),
+    check(
+      "tai_lieu_nguon_du_cap",
+      sql`(${t.nguonLoai} is null) = (${t.nguonId} is null)`,
+    ),
   ],
 );
 
