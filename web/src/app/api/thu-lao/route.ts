@@ -24,7 +24,8 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  if (!(await yeuCauVaiTro("quan_ly"))) {
+  const nguoiDung = await yeuCauVaiTro("quan_ly");
+  if (!nguoiDung) {
     return NextResponse.json(
       { message: "Chốt bảng thù lao là việc của quản lý — đây là số tiền sẽ trả ra." },
       { status: 403 },
@@ -38,7 +39,7 @@ export async function POST(request: Request) {
   }
 
   try {
-    return NextResponse.json({ thuLao: await chotThuLao(gv, ky) }, { status: 201 });
+    return NextResponse.json({ thuLao: await chotThuLao(gv, ky, nguoiDung.id) }, { status: 201 });
   } catch (e) {
     if (e instanceof KyDaKhoaError) return NextResponse.json({ message: e.message }, { status: 409 });
     return NextResponse.json(

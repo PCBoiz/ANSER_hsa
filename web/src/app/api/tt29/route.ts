@@ -18,7 +18,8 @@ export async function GET() {
 }
 
 export async function PATCH(request: Request) {
-  if (!(await yeuCauVaiTro("quan_ly"))) {
+  const nguoiDung = await yeuCauVaiTro("quan_ly");
+  if (!nguoiDung) {
     return NextResponse.json(
       { message: "Đánh dấu hồ sơ TT29 là việc của quản lý — đây là tuyên bố pháp lý." },
       { status: 403 },
@@ -29,10 +30,10 @@ export async function PATCH(request: Request) {
 
   // Hai thao tác gộp một đường vì cùng là "sửa hồ sơ TT29".
   if (b.hanhDong === "cong_khai_tat_ca_giao_vien") {
-    return NextResponse.json({ soGiaoVien: await danhDauCongKhaiTatCaGiaoVien() });
+    return NextResponse.json({ soGiaoVien: await danhDauCongKhaiTatCaGiaoVien(nguoiDung.id) });
   }
   if (b.hanhDong === "ghi_nhan_bao_cao" && b.giaoVienId) {
-    const gv = await ghiNhanBaoCaoHieuTruong(String(b.giaoVienId));
+    const gv = await ghiNhanBaoCaoHieuTruong(String(b.giaoVienId), nguoiDung.id);
     if (!gv) return NextResponse.json({ message: "Không tìm thấy giáo viên." }, { status: 404 });
     return NextResponse.json({ giaoVien: gv });
   }
@@ -47,6 +48,6 @@ export async function PATCH(request: Request) {
   }
 
   return NextResponse.json({
-    hoSo: await datTrangThai(muc, trangThai, b.congKhaiTai ? String(b.congKhaiTai) : null),
+    hoSo: await datTrangThai(muc, trangThai, b.congKhaiTai ? String(b.congKhaiTai) : null, null, nguoiDung.id),
   });
 }

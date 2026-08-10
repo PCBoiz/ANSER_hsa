@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { and, desc, eq, inArray } from "drizzle-orm";
 import { db } from "@/server/db/client";
 import { taiLieu } from "@/server/db/schema";
+import { ghiNhatKy } from "@/server/store/nhatKy";
 import {
   duongDanKho,
   vaiTroToiThieuXem,
@@ -85,6 +86,10 @@ export async function ghiTaiLieu(input: {
   return { ban: rows[0], duongDan };
 }
 
-export async function xoaTaiLieu(id: string) {
+export async function xoaTaiLieu(id: string, nguoiDungId: string | null = null) {
+  const [cu] = await db.select().from(taiLieu).where(eq(taiLieu.id, id)).limit(1);
   await db.delete(taiLieu).where(eq(taiLieu.id, id));
+  // Chỉ ghi khi người thật xoá một tài liệu đã có. Lúc dọn bản ghi mồ côi vì
+  // đẩy file hỏng thì không truyền người vào — dòng đó không nói gì về hành vi.
+  if (cu && nguoiDungId) await ghiNhatKy("tai_lieu", id, "xoa", nguoiDungId, cu, undefined);
 }

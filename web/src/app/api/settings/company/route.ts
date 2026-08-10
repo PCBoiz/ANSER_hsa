@@ -10,7 +10,8 @@ export async function GET() {
 }
 
 export async function PATCH(request: Request) {
-  if (!(await yeuCauVaiTro("quan_ly"))) {
+  const nguoiDung = await yeuCauVaiTro("quan_ly");
+  if (!nguoiDung) {
     return NextResponse.json({ message: "Không đủ quyền." }, { status: 403 });
   }
 
@@ -40,5 +41,5 @@ export async function PATCH(request: Request) {
     patch.vungLuongToiThieu = v;
   }
 
-  return NextResponse.json({ caiDat: await capNhatCaiDatCongTy(patch) });
+  return NextResponse.json({ caiDat: await capNhatCaiDatCongTy(patch, nguoiDung.id) });
 }

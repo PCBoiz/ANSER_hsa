@@ -8,11 +8,25 @@
  */
 
 import { cookies } from "next/headers";
-import { and, eq, gt, isNull } from "drizzle-orm";
+import { and, eq, gt, isNull, lt, or } from "drizzle-orm";
 import { COOKIE_NAME, kyToken, xacMinhToken } from "@/server/auth";
 import { db } from "@/server/db/client";
 import { phienDangNhap } from "@/server/db/schema";
 import { timNguoiDungTheoId, type VaiTro } from "@/server/store/users";
+
+/**
+ * Dọn phiên đã hết hạn hoặc đã thu hồi từ lâu.
+ *
+ * Audit 10/08/2026: bảng `phien_dang_nhap` chỉ lớn lên — mỗi lần đăng nhập thêm
+ * một dòng, không ai xoá. Giữ 30 ngày sau khi hết hạn là đủ để còn tra được
+ * "ai đăng nhập lúc nào" mà không để bảng phình vô hạn.
+ */
+export async function donPhienCu(): Promise<void> {
+  const moc = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+  await db
+    .delete(phienDangNhap)
+    .where(or(lt(phienDangNhap.hetHanLuc, moc), lt(phienDangNhap.thuHoiLuc, moc)));
+}
 
 export async function taoPhien(
   nguoiDungId: string,

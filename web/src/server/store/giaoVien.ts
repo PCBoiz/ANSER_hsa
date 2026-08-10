@@ -1,6 +1,7 @@
 import { and, asc, desc, eq, inArray, isNull, sql as raw } from "drizzle-orm";
 import { db } from "@/server/db/client";
 import { buoiDay, camKet08, giaoVien, thuLao } from "@/server/db/schema";
+import { ghiNhatKy } from "@/server/store/nhatKy";
 import { layThamSo } from "@/server/store/thamSo";
 import { KyDaKhoaError, cacKyDangKhoa } from "@/server/store/soThuChi";
 import { laKyHopLe, suyKyTuNgay } from "@/server/tinhToan/soThuChi";
@@ -163,7 +164,7 @@ export async function xemTruocThuLao(giaoVienId: string, ky: string): Promise<Xe
  * ngần này" mà không ai mở ra được danh sách buổi — vi phạm thẳng lời hứa "mọi
  * con số truy được về chứng từ".
  */
-export async function chotThuLao(giaoVienId: string, ky: string) {
+export async function chotThuLao(giaoVienId: string, ky: string, nguoiDungId: string | null = null) {
   const xem = await xemTruocThuLao(giaoVienId, ky);
   if ("loi" in xem) throw new Error(xem.loi);
   if (xem.ketQua.soBuoi === 0) throw new Error("Kỳ này chưa có buổi dạy nào chưa chốt.");
@@ -185,12 +186,16 @@ export async function chotThuLao(giaoVienId: string, ky: string) {
     .returning();
 
   await db.update(buoiDay).set({ thuLaoId: ban.id }).where(inArray(buoiDay.id, xem.buoiIds));
+  // Số tiền sẽ trả ra khỏi trung tâm — phải biết ai chốt và chốt cái gì.
+  await ghiNhatKy("thu_lao", ban.id, "them", nguoiDungId, undefined, { ...ban, buoiIds: xem.buoiIds });
   return ban;
 }
 
-export async function huyThuLao(id: string) {
+export async function huyThuLao(id: string, nguoiDungId: string | null = null) {
+  const [cu] = await db.select().from(thuLao).where(eq(thuLao.id, id)).limit(1);
   await db.update(buoiDay).set({ thuLaoId: null }).where(eq(buoiDay.thuLaoId, id));
   await db.delete(thuLao).where(eq(thuLao.id, id));
+  if (cu) await ghiNhatKy("thu_lao", id, "xoa", nguoiDungId, cu, undefined);
 }
 
 export async function danhSachThuLao(ky?: string) {

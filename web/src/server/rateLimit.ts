@@ -9,7 +9,7 @@
  * bộ đếm trong RAM reset mỗi lần deploy — đúng lúc không nên reset.
  */
 
-import { and, count, eq, gte, or } from "drizzle-orm";
+import { and, count, eq, gte, lt, or } from "drizzle-orm";
 import { db } from "@/server/db/client";
 import { lanDangNhapHong } from "@/server/db/schema";
 
@@ -44,4 +44,19 @@ export async function ghiLanHong(email: string, diaChiIp: string | null): Promis
 /** Gọi sau khi đăng nhập thành công — đừng để lần hỏng cũ treo án người dùng thật. */
 export async function xoaLanHong(email: string): Promise<void> {
   await db.delete(lanDangNhapHong).where(eq(lanDangNhapHong.email, email.toLowerCase()));
+}
+
+/**
+ * Dọn rác đã quá cửa sổ.
+ *
+ * Audit 10/08/2026: `xoaLanHong` chỉ xoá theo email đăng nhập THÀNH CÔNG. Dòng
+ * của những email không bao giờ đăng nhập được — tức là chính đám dò mật khẩu —
+ * nằm lại vĩnh viễn. Bảng chỉ lớn lên, và mỗi lần kiểm chặn lại quét qua nhiều
+ * hơn một chút.
+ *
+ * Gọi kèm lúc đăng nhập cho rẻ, không cần cron. Ngoài cửa sổ thì dòng đó không
+ * còn ảnh hưởng quyết định chặn nữa nên xoá là an toàn.
+ */
+export async function donRacCu(): Promise<void> {
+  await db.delete(lanDangNhapHong).where(lt(lanDangNhapHong.taoLuc, moc()));
 }

@@ -10,16 +10,29 @@ export async function register() {
   const { layKhoaKy } = await import("@/server/moiTruong");
   layKhoaKy();
 
+  /**
+   * Gieo dữ liệu nền — CHỈ KHI CHƯA CÓ.
+   *
+   * Trước audit 10/08/2026, khối này chạy đủ ~20 lệnh INSERT mỗi lần
+   * `register()` được gọi. Trên VPS thì một lần khi khởi động, chấp nhận được.
+   * Trên Vercel thì `register()` chạy MỖI LẦN có instance mới — tức là mỗi cold
+   * start gõ vào database hai chục lượt ghi chỉ để không ghi gì (nhờ
+   * `onConflictDoNothing`), và cộng thẳng vào độ trễ của người dùng đầu tiên.
+   *
+   * Nay: một câu đếm rẻ, thấy đã có thì thôi. Vẫn tự lành khi dựng môi trường
+   * mới, mà không trả giá ở mọi cold start.
+   */
+  const { demChuaDuyet, gieoThamSoPhapLy, kiemTraBacThue } = await import("@/server/store/thamSo");
   const { gieoTaiKhoanDemo } = await import("@/server/store/users");
   const { baoDamDongCaiDat } = await import("@/server/store/settings");
-  const { demChuaDuyet, gieoThamSoPhapLy, kiemTraBacThue } = await import("@/server/store/thamSo");
 
-  await gieoTaiKhoanDemo();
-  await baoDamDongCaiDat();
-  await gieoThamSoPhapLy();
+  const daCo = await demChuaDuyet().catch(() => null);
+  if (!daCo || daCo.thamSo + daCo.bacThue === 0) {
+    await gieoTaiKhoanDemo();
+    await baoDamDongCaiDat();
+    await gieoThamSoPhapLy();
+  }
 
-  // Không chặn app chạy — phần lớn nghiệp vụ không cần biểu thuế — nhưng tool
-  // tính lương thì phải dừng khi biểu hở.
   const bac = await kiemTraBacThue();
   if (!bac.du) {
     console.warn(
@@ -33,8 +46,7 @@ export async function register() {
   if (chua.thamSo + chua.bacThue > 0) {
     console.warn(
       `[tham số pháp lý] ${chua.thamSo} tham số và ${chua.bacThue} bậc thuế CHƯA CÓ KẾ TOÁN RÀ. ` +
-        "Số do máy tra về, có ghi nguồn nhưng chưa ai xác nhận — mọi bảng tính từ chúng " +
-        "phải đóng dấu tương ứng.",
+        "Số do máy tra về, có ghi nguồn nhưng chưa ai xác nhận.",
     );
   }
 }

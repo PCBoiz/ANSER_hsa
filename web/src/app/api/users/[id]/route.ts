@@ -41,7 +41,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     patch.matKhauHash = bcrypt.hashSync(body.matKhauMoi, 10);
   }
 
-  const capNhat = await capNhatNguoiDung(id, patch);
+  const capNhat = await capNhatNguoiDung(id, patch, nguoiThucHien.id);
 
   // Hạ quyền hoặc đổi mật khẩu người khác mà không cắt phiên của họ thì họ vẫn
   // giữ nguyên quyền cũ tới bảy ngày. Đúng chỗ Body không xử lý được.
@@ -67,6 +67,6 @@ export async function DELETE(_request: Request, { params }: { params: Promise<{ 
   }
 
   await thuHoiTatCaPhien(id);
-  await xoaNguoiDung(id);
+  await xoaNguoiDung(id, nguoiThucHien.id);
   return new NextResponse(null, { status: 204 });
 }

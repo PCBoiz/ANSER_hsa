@@ -33,6 +33,6 @@ export async function DELETE(_request: Request, { params }: { params: Promise<{ 
     console.error("[kho] không xoá được file, giữ nguyên bản ghi", { id: ban.id, error });
     return NextResponse.json({ message: "Không xoá được file trên kho." }, { status: 502 });
   }
-  await xoaTaiLieu(ban.id);
+  await xoaTaiLieu(ban.id, nguoiDung.id);
   return new NextResponse(null, { status: 204 });
 }

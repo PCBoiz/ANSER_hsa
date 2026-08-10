@@ -2,6 +2,7 @@ import bcrypt from "bcryptjs";
 import { asc, eq } from "drizzle-orm";
 import { db } from "@/server/db/client";
 import { nguoiDung } from "@/server/db/schema";
+import { ghiNhatKy, locNhayCam } from "@/server/store/nhatKy";
 
 export type NguoiDung = typeof nguoiDung.$inferSelect;
 
@@ -51,13 +52,22 @@ export async function capNhatNguoiDung(
     vaiTro: VaiTro;
     nhanVienId: string | null;
   }>,
+  nguoiThucHienId: string | null = null,
 ): Promise<NguoiDung | undefined> {
+  const [cu] = await db.select().from(nguoiDung).where(eq(nguoiDung.id, id)).limit(1);
   const rows = await db.update(nguoiDung).set(patch).where(eq(nguoiDung.id, id)).returning();
+  // Chỉ ghi nhật ký khi đổi VAI TRÒ. Đổi tên hay số điện thoại không đáng một
+  // dòng vĩnh viễn; đổi quyền thì đáng, vì đó là ai được xem lương của ai.
+  if (rows[0] && patch.vaiTro !== undefined && cu?.vaiTro !== patch.vaiTro) {
+    await ghiNhatKy("nguoi_dung", id, "sua", nguoiThucHienId, locNhayCam(cu), locNhayCam(rows[0]));
+  }
   return rows[0];
 }
 
-export async function xoaNguoiDung(id: string) {
+export async function xoaNguoiDung(id: string, nguoiThucHienId: string | null = null) {
+  const [cu] = await db.select().from(nguoiDung).where(eq(nguoiDung.id, id)).limit(1);
   await db.delete(nguoiDung).where(eq(nguoiDung.id, id));
+  if (cu) await ghiNhatKy("nguoi_dung", id, "xoa", nguoiThucHienId, locNhayCam(cu), undefined);
 }
 
 export async function demQuanTri() {

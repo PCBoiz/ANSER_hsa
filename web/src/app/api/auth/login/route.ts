@@ -2,8 +2,8 @@ import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { COOKIE_NAME, tuyChonCookie } from "@/server/auth";
-import { biChan, ghiLanHong, xoaLanHong, CUA_SO_PHUT } from "@/server/rateLimit";
-import { taoPhien } from "@/server/session";
+import { biChan, donRacCu, ghiLanHong, xoaLanHong, CUA_SO_PHUT } from "@/server/rateLimit";
+import { donPhienCu, taoPhien } from "@/server/session";
 import { timNguoiDungTheoEmail, raNgoai } from "@/server/store/users";
 
 function layIp(request: Request): string | null {
@@ -38,6 +38,8 @@ export async function POST(request: Request) {
   }
 
   await xoaLanHong(email);
+  // Dọn rác kèm lúc đăng nhập — rẻ, và không phải dựng cron cho hai bảng nhỏ.
+  await Promise.all([donRacCu(), donPhienCu()]).catch(() => {});
   const token = await taoPhien(nguoiDung.id, ip, request.headers.get("user-agent"));
   (await cookies()).set(COOKIE_NAME, token, tuyChonCookie);
 

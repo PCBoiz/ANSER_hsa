@@ -11,10 +11,11 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
 }
 
 export async function DELETE(_request: Request, { params }: { params: Promise<{ id: string }> }) {
-  if (!(await yeuCauVaiTro("quan_ly"))) {
+  const nguoiDung = await yeuCauVaiTro("quan_ly");
+  if (!nguoiDung) {
     return NextResponse.json({ message: "Không đủ quyền." }, { status: 403 });
   }
   // Huỷ bảng thì trả các buổi về trạng thái chưa chốt, không xoá buổi.
-  await huyThuLao((await params).id);
+  await huyThuLao((await params).id, nguoiDung.id);
   return new NextResponse(null, { status: 204 });
 }

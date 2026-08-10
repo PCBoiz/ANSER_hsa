@@ -1,6 +1,7 @@
 import { count, eq, isNull, or, sql as raw } from "drizzle-orm";
 import { db } from "@/server/db/client";
 import { giaoVien, hoSoTt29, lopHoc } from "@/server/db/schema";
+import { ghiNhatKy } from "@/server/store/nhatKy";
 import {
   MUC_TT29,
   soiHoSoTt29,
@@ -16,11 +17,16 @@ export async function layHoSo(): Promise<DongHoSo[]> {
   return db.select().from(hoSoTt29);
 }
 
+/**
+ * Đánh dấu một mục TT29 là đã công khai LÀ MỘT TUYÊN BỐ PHÁP LÝ. Phải biết ai
+ * tuyên bố và lúc nào — nếu có thanh tra thì đó là câu hỏi đầu tiên.
+ */
 export async function datTrangThai(
   muc: MucTt29,
   trangThai: TrangThaiMuc,
   congKhaiTai?: string | null,
   ghiChu?: string | null,
+  nguoiDungId: string | null = null,
 ) {
   const [co] = await db.select().from(hoSoTt29).where(eq(hoSoTt29.muc, muc)).limit(1);
   const gia = {
@@ -31,9 +37,11 @@ export async function datTrangThai(
   };
   if (co) {
     const r = await db.update(hoSoTt29).set(gia).where(eq(hoSoTt29.muc, muc)).returning();
+    await ghiNhatKy("ho_so_tt29", r[0].id, "sua", nguoiDungId, co, r[0]);
     return r[0];
   }
   const r = await db.insert(hoSoTt29).values({ muc, ...gia }).returning();
+  await ghiNhatKy("ho_so_tt29", r[0].id, "them", nguoiDungId, undefined, r[0]);
   return r[0];
 }
 
@@ -81,22 +89,24 @@ export async function soi(): Promise<{ ketQua: KetQuaSoi; hoSo: DongHoSo[]; duLi
 }
 
 /** Đánh dấu toàn bộ giáo viên là đã có trong danh sách công khai. */
-export async function danhDauCongKhaiTatCaGiaoVien() {
+export async function danhDauCongKhaiTatCaGiaoVien(nguoiDungId: string | null = null) {
   const r = await db
     .update(giaoVien)
     .set({ congKhaiDanhSach: true })
     .where(eq(giaoVien.congKhaiDanhSach, false))
     .returning();
+  for (const g of r) await ghiNhatKy("giao_vien", g.id, "sua", nguoiDungId, undefined, g);
   return r.length;
 }
 
 /** Ghi nhận một giáo viên trường công đã báo cáo hiệu trưởng. */
-export async function ghiNhanBaoCaoHieuTruong(giaoVienId: string) {
+export async function ghiNhanBaoCaoHieuTruong(giaoVienId: string, nguoiDungId: string | null = null) {
   const r = await db
     .update(giaoVien)
     .set({ daBaoCaoHieuTruong: true })
     .where(eq(giaoVien.id, giaoVienId))
     .returning();
+  if (r[0]) await ghiNhatKy("giao_vien", r[0].id, "sua", nguoiDungId, undefined, r[0]);
   return r[0];
 }
 

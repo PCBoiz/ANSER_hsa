@@ -1,6 +1,7 @@
 import { and, desc, eq, inArray, sql as raw } from "drizzle-orm";
 import { db } from "@/server/db/client";
-import { khoanChi, khoanThu, kyKeToan, nhatKyThayDoi } from "@/server/db/schema";
+import { khoanChi, khoanThu, kyKeToan } from "@/server/db/schema";
+import { ghiNhatKy } from "@/server/store/nhatKy";
 import { laKyHopLe, suyKyTuNgay } from "@/server/tinhToan/soThuChi";
 
 export type KhoanThu = typeof khoanThu.$inferSelect;
@@ -38,30 +39,6 @@ export async function cacKyDangKhoa(cacKy: string[]): Promise<string[]> {
 async function chanNeuKhoa(cacKy: string[]) {
   const khoa = await cacKyDangKhoa(cacKy);
   if (khoa.length > 0) throw new KyDaKhoaError(khoa);
-}
-
-/* ─────────────────────────────────────────────── nhật ký thay đổi ───── */
-
-/**
- * Bảng `nhat_ky_thay_doi` có trigger chặn UPDATE và DELETE ở tầng DB, nên hàm
- * này chỉ có đường ghi thêm — không có `capNhatNhatKy` và sẽ không bao giờ có.
- */
-async function ghiNhatKy(
-  bang: string,
-  banGhiId: string,
-  hanhDong: "them" | "sua" | "xoa",
-  nguoiDungId: string,
-  truoc?: unknown,
-  sau?: unknown,
-) {
-  await db.insert(nhatKyThayDoi).values({
-    bang,
-    banGhiId,
-    hanhDong,
-    truoc: truoc === undefined ? null : (truoc as object),
-    sau: sau === undefined ? null : (sau as object),
-    nguoiDungId,
-  });
 }
 
 /* ────────────────────────────────────────────────────── ghi sổ ───── */
