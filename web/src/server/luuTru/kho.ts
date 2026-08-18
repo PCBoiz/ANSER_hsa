@@ -23,8 +23,24 @@ import type { DongKho } from "@/server/tinhToan/doiChieuKho";
 
 const BIEN_CAN = ["S3_ENDPOINT", "S3_BUCKET", "S3_ACCESS_KEY_ID", "S3_SECRET_ACCESS_KEY"] as const;
 
+/**
+ * Đọc biến môi trường và CẮT khoảng trắng hai đầu.
+ *
+ * Không phải làm đẹp. Dán khoá từ bảng điều khiển Cloudflare vào ô biến của
+ * Railway rất dễ dính thêm dấu cách hoặc xuống dòng, và hậu quả thì lộ ra cách
+ * chỗ gây lỗi ba tầng: URL vẫn ký được (ký chỉ là ghép chuỗi, không kiểm gì),
+ * rồi R2 mới trả `Credential access key has length 35, should be 32` — cho
+ * trình duyệt, không cho log máy chủ. Người dùng thấy "tải file hỏng".
+ *
+ * Đã mất một buổi vì đúng ba ký tự trắng, nên cắt ở đây một lần cho xong.
+ */
+function bien(ten: (typeof BIEN_CAN)[number] | "S3_REGION"): string | undefined {
+  const v = process.env[ten]?.trim();
+  return v ? v : undefined;
+}
+
 export function bienConThieu(): string[] {
-  return BIEN_CAN.filter((b) => !process.env[b]);
+  return BIEN_CAN.filter((b) => !bien(b));
 }
 
 export function khoCauHinhChua(): boolean {
@@ -41,11 +57,11 @@ function layKhach(): S3Client {
   if (!khach) {
     khach = new S3Client({
       // R2 và B2 đều bỏ qua region nhưng SDK bắt buộc phải có một giá trị.
-      region: process.env.S3_REGION || "auto",
-      endpoint: process.env.S3_ENDPOINT,
+      region: bien("S3_REGION") || "auto",
+      endpoint: bien("S3_ENDPOINT"),
       credentials: {
-        accessKeyId: process.env.S3_ACCESS_KEY_ID!,
-        secretAccessKey: process.env.S3_SECRET_ACCESS_KEY!,
+        accessKeyId: bien("S3_ACCESS_KEY_ID")!,
+        secretAccessKey: bien("S3_SECRET_ACCESS_KEY")!,
       },
       forcePathStyle: true, // B2 cần; R2 chấp nhận được
     });
@@ -53,7 +69,7 @@ function layKhach(): S3Client {
   return khach;
 }
 
-const BUCKET = () => process.env.S3_BUCKET!;
+const BUCKET = () => bien("S3_BUCKET")!;
 
 export async function dayLen(duongDan: string, noiDung: Uint8Array, dinhDang?: string): Promise<void> {
   await layKhach().send(
@@ -99,8 +115,17 @@ export type ThongTinObject = { kichThuoc: number; etag: string; dinhDang: string
  *   - trần dung lượng ép được THẬT, không phải nhờ trình duyệt tử tế
  *   - ETag do R2 tính, không do client gửi
  *
- * Trả `null` khi object không tồn tại — tức là trình duyệt báo xong nhưng thực
+ * Trả `null` khi object KHÔNG TỒN TẠI — tức là trình duyệt báo xong nhưng thực
  * ra chưa đẩy được. Không có nó thì sổ có một dòng trỏ vào hư không.
+ *
+ * Mọi lỗi KHÁC thì ném ra, không nuốt. Trước đây hàm này `catch { return null }`
+ * cho tất cả, và cái giá phải trả là thật: khoá R2 trên Railway dính ba ký tự
+ * trắng ở cuối, R2 từ chối xác thực, hàm này trả `null`, và người dùng nhận
+ * đúng câu "Chưa thấy file trên kho. Có thể lần đẩy lên chưa xong." — một câu
+ * chỉ đường sai hoàn toàn, vì file chưa bao giờ là vấn đề.
+ *
+ * Không tìm thấy và không xác thực được là hai chuyện khác nhau, và chỉ có
+ * chuyện thứ nhất là bình thường.
  */
 export async function thongTinObject(duongDan: string): Promise<ThongTinObject | null> {
   try {
@@ -114,9 +139,16 @@ export async function thongTinObject(duongDan: string): Promise<ThongTinObject |
       etag: String(r.ETag ?? "").replace(/^"|"$/g, ""),
       dinhDang: r.ContentType ?? null,
     };
-  } catch {
-    return null;
+  } catch (e) {
+    if (laKhongTonTai(e)) return null;
+    throw e;
   }
+}
+
+/** 404/NotFound/NoSuchKey = không có file. Mọi mã khác là chuyện của cấu hình. */
+function laKhongTonTai(e: unknown): boolean {
+  const x = e as { name?: string; $metadata?: { httpStatusCode?: number } };
+  return x?.$metadata?.httpStatusCode === 404 || x?.name === "NotFound" || x?.name === "NoSuchKey";
 }
 
 /**

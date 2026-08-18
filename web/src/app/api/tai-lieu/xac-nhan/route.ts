@@ -35,7 +35,20 @@ export async function POST(request: Request) {
     return NextResponse.json({ message: "Chỉ quản lý mới được tải hợp đồng lên." }, { status: 403 });
   }
 
-  const tt = await thongTinObject(duongDan);
+  // Tách hai kết cục vốn từng bị gộp làm một: KHÔNG CÓ FILE (chuyện thường, lỗi
+  // của lần đẩy lên) và KHÔNG HỎI ĐƯỢC KHO (chuyện của cấu hình máy chủ). Gộp
+  // lại thì mọi khoá R2 sai đều hiện ra thành "file chưa đẩy xong", và người ta
+  // đi sửa đúng chỗ không hỏng.
+  let tt;
+  try {
+    tt = await thongTinObject(duongDan);
+  } catch (e) {
+    console.error("[kho] không hỏi được R2 khi xác nhận", e);
+    return NextResponse.json(
+      { message: "Không kết nối được kho file. Kiểm tra lại khoá R2 trong biến môi trường." },
+      { status: 502 },
+    );
+  }
   if (!tt) {
     return NextResponse.json(
       { message: "Chưa thấy file trên kho. Có thể lần đẩy lên chưa xong." },
